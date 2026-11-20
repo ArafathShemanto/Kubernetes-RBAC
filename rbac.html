@@ -1,0 +1,1354 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kubernetes RBAC Shohoj Path</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: ekta 46rem porar column; simulator band ta 82rem porjonto chhoray.
+   Rong er mane: nil = ke (Subject), sobuj-nil = ki (Role), kohla = jora (Binding). */
+:root{
+  --bg:#F2F4F8;--surface:#FFFFFF;--sunk:#E5E9F0;--ink:#101A2B;--muted:#55627A;--line:#CBD3DF;--line-2:#97A3B6;
+  --who:#2456C9;--who-soft:#DEE7FB;--on-who:#FFFFFF;
+  --what:#0A766B;--what-soft:#D5EEE9;
+  --glue:#96560A;--glue-soft:#F6E7CF;
+  --ok:#17783C;--ok-soft:#D8F0E0;--no:#BC2F28;--no-soft:#F9DFDC;
+  --code-bg:#0F1726;--code-ink:#DCE5F4;--code-dim:#8696B0;--code-key:#8FB6FF;--code-str:#A2E2BB;--code-line:#243049;--code-err:#FF9A91;--code-ok:#8FE0AC;
+  --f-display:"Space Grotesk","Hind Siliguri","Nirmala UI","Segoe UI",system-ui,sans-serif;
+  --f-body:"Inter","Hind Siliguri","Nirmala UI","Segoe UI",system-ui,-apple-system,sans-serif;
+  --f-mono:"JetBrains Mono","Hind Siliguri","Nirmala UI",ui-monospace,"Cascadia Code",Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D131E;--surface:#151D2B;--sunk:#0A0F18;--ink:#E7ECF5;--muted:#9BA8BD;--line:#283347;--line-2:#4D5B76;
+  --who:#86AAFF;--who-soft:#1B2A4D;--on-who:#0D131E;
+  --what:#4FCDB9;--what-soft:#0F322E;--glue:#EDB25B;--glue-soft:#3A2A10;
+  --ok:#5CCB88;--ok-soft:#12331F;--no:#FF857B;--no-soft:#3F1A17;
+  --code-bg:#070B12;--code-line:#1C2638;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D131E;--surface:#151D2B;--sunk:#0A0F18;--ink:#E7ECF5;--muted:#9BA8BD;--line:#283347;--line-2:#4D5B76;
+  --who:#86AAFF;--who-soft:#1B2A4D;--on-who:#0D131E;
+  --what:#4FCDB9;--what-soft:#0F322E;--glue:#EDB25B;--glue-soft:#3A2A10;
+  --ok:#5CCB88;--ok-soft:#12331F;--no:#FF857B;--no-soft:#3F1A17;
+  --code-bg:#070B12;--code-line:#1C2638;color-scheme:dark}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 1rem/1.65 var(--f-body);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+.wrap{max-width:46rem;margin-inline:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap.wide{max-width:82rem}
+h1,h2,h3{font-family:var(--f-display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,5.4vw,3.1rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(1.45rem,3.4vw,1.95rem);font-weight:600;letter-spacing:-.01em}
+h3{font-size:1.15rem;font-weight:600}
+p,ul,ol,dl,dd,figure{margin:0}
+a{color:var(--who)}
+code,.mono{font-family:var(--f-mono);font-size:.87em}
+:not(pre)>code{background:var(--sunk);border-radius:5px;padding:.08em .35em;overflow-wrap:anywhere}
+:focus-visible{outline:2px solid var(--who);outline-offset:2px}
+button{font-family:inherit}
+section{padding-block:2.75rem}
+section[id],main[id]{scroll-margin-top:calc(60px + env(safe-area-inset-top,0px))}
+.flow{display:grid;gap:1rem}
+.flow>*{min-width:0}
+.eyebrow{font:600 .76rem var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.sec-head{display:grid;gap:.5rem;margin-bottom:1.25rem}
+ul.plain,ol.plain{padding-left:1.25rem;display:grid;gap:.45rem}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:1rem;min-height:52px}
+.brand{font:700 1rem var(--f-display);color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand span{color:var(--muted);font-weight:500}
+.nav{display:flex;gap:.15rem;overflow-x:auto;scrollbar-width:none;min-width:0;margin-left:auto}
+.nav::-webkit-scrollbar{display:none}
+.nav a{padding:.35rem .6rem;border-radius:8px;color:var(--muted);text-decoration:none;font-size:.88rem;white-space:nowrap}
+.nav a:hover{background:var(--sunk);color:var(--ink)}
+.nav a.cta{color:var(--who);font-weight:600}
+
+/* hero */
+.hero{padding-block:3rem 2rem}
+.lead{font-size:1.1rem;color:var(--muted);max-width:40rem}
+.formula{display:flex;flex-wrap:wrap;gap:.5rem;align-items:stretch}
+.fx{display:grid;gap:.05rem;padding:.55rem .85rem;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+.fx b{font:600 1rem var(--f-display)}
+.fx i{font-style:normal;font-size:.82rem;color:var(--muted)}
+.fx.who b{color:var(--who)}.fx.what b{color:var(--what)}.fx.glue b{color:var(--glue)}.fx.res b{color:var(--ok)}
+.op{align-self:center;font:600 1.2rem var(--f-display);color:var(--muted)}
+.btnrow{display:flex;flex-wrap:wrap;gap:.6rem}
+.btn{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:10px;padding:.55rem .95rem;font:600 .92rem var(--f-body);cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--who)}
+.btn.pri{background:var(--who);border-color:var(--who);color:var(--on-who)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* analogy map */
+.map{display:grid;gap:0;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.map>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:.75rem;padding:.6rem .9rem;border-top:1px solid var(--line);align-items:baseline}
+.map>div:first-child{border-top:0;background:var(--sunk);font:600 .76rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.map dt{color:var(--muted)}
+.map dd b{font-family:var(--f-display);font-weight:600}
+.map dd span{display:block;font-size:.86rem;color:var(--muted)}
+
+/* boxes */
+.note,.simple{border-radius:var(--r);padding:.9rem 1rem;display:grid;gap:.4rem}
+.note{background:var(--who-soft)}
+.simple{background:var(--glue-soft)}
+.note>b:first-child,.simple>b:first-child{font:600 .76rem var(--f-body);letter-spacing:.08em;text-transform:uppercase}
+.note>b:first-child{color:var(--who)}.simple>b:first-child{color:var(--glue)}
+.warn{border:1px solid var(--no);background:var(--no-soft);border-radius:var(--r);padding:.8rem 1rem}
+details.more{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:.7rem 1rem}
+details.more summary{cursor:pointer;font-weight:600}
+details.more[open] summary{margin-bottom:.7rem}
+
+/* pipeline */
+.pipe{list-style:none;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;counter-reset:p}
+.pipe li{counter-increment:p;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem;display:grid;gap:.2rem;align-content:start}
+.pipe li::before{content:counter(p);font:600 .8rem var(--f-mono);color:var(--muted)}
+.pipe b{font-family:var(--f-display);font-weight:600}
+.pipe span{font-size:.86rem;color:var(--muted)}
+.pipe em{font-style:normal;font:500 .78rem var(--f-mono);color:var(--no)}
+@media(max-width:700px){.pipe{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* cards */
+.cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
+@media(max-width:760px){.cards3{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem;display:grid;gap:.55rem;align-content:start;min-width:0}
+.card .k{font:600 .76rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--who)}
+.card p{font-size:.94rem}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+@media(max-width:700px){.two{grid-template-columns:minmax(0,1fr)}}
+.two .card .k{color:var(--what)}
+
+/* tables */
+.tscroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:.5rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+thead th{border-top:0;background:var(--sunk);font:600 .76rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+td code{white-space:nowrap}
+
+/* combos */
+.combos{display:grid;gap:.6rem}
+.combo{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.8rem 1rem;display:grid;grid-template-columns:minmax(0,1.1fr) auto minmax(0,1.4fr);gap:.6rem 1rem;align-items:center}
+@media(max-width:760px){.combo{grid-template-columns:minmax(0,1fr)}}
+.pair{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+.pill{border-radius:999px;padding:.2rem .65rem;font:600 .82rem var(--f-mono)}
+.pill.what{background:var(--what-soft);color:var(--what)}
+.pill.glue{background:var(--glue-soft);color:var(--glue)}
+.scope{display:flex;gap:.3rem}
+.scope span{border:1px dashed var(--line-2);color:var(--muted);border-radius:8px;padding:.2rem .5rem;font:500 .8rem var(--f-mono);white-space:nowrap}
+.scope span::before{content:"– "}
+.scope span.on{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok);font-weight:600}
+.scope span.on::before{content:"✓ "}
+.scope span.bad{border:1px solid var(--no);background:var(--no-soft);color:var(--no);font-weight:600}
+.scope span.bad::before{content:"✕ "}
+.combo p{font-size:.92rem;color:var(--muted)}
+
+/* code */
+.codebox{background:var(--code-bg);border-radius:var(--r);overflow:hidden;border:1px solid var(--code-line);min-width:0}
+.codebar{display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.4rem .5rem .4rem .9rem;border-bottom:1px solid var(--code-line);color:var(--code-dim);font:500 .78rem var(--f-mono)}
+.copy{background:none;border:1px solid var(--code-line);color:var(--code-ink);border-radius:7px;padding:.2rem .6rem;font:500 .75rem var(--f-body);cursor:pointer}
+pre.code{margin:0;padding:.9rem;overflow-x:auto;color:var(--code-ink);font:400 .83rem/1.6 var(--f-mono);tab-size:2}
+pre.code .k{color:var(--code-key)}pre.code .s{color:var(--code-str)}pre.code .c{color:var(--code-dim);font-style:italic}
+
+/* simulator */
+.band{background:var(--sunk);border-block:1px solid var(--line)}
+.sim-pick{display:grid;gap:.7rem;margin-bottom:1rem}
+.lbl{font:600 .8rem var(--f-body);color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.chipb{border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:999px;padding:.4rem .85rem;font:500 .88rem var(--f-body);cursor:pointer}
+.chipb:hover{border-color:var(--who)}
+.chipb[aria-pressed="true"]{background:var(--who);border-color:var(--who);color:var(--on-who)}
+.custom{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.6rem .9rem}
+.custom summary{cursor:pointer;font-weight:600;font-size:.92rem}
+.qrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;margin-top:.7rem}
+@media(max-width:560px){.qrow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.qrow label{display:grid;gap:.2rem;font-size:.78rem;color:var(--muted);font-weight:600}
+.qrow select{font:500 .92rem var(--f-body);padding:.45rem .5rem;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);min-width:0;width:100%}
+.say{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.7rem .9rem;display:grid;gap:.15rem}
+.say small{font:500 .78rem var(--f-mono);color:var(--muted)}
+
+.sim-grid>*+*{margin-top:.8rem}
+.sim-fig{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.75rem}
+.sim-fig figcaption{font-size:.84rem;color:var(--muted);margin-top:.5rem}
+.sim-ctl{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.7rem .8rem;display:grid;gap:.55rem;position:sticky;bottom:calc(.5rem + env(safe-area-inset-bottom,0px));z-index:5;box-shadow:0 6px 24px rgb(0 0 0 / .18)}
+.dots{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap}
+.dot{width:1.7rem;height:1.7rem;border-radius:50%;border:1px solid var(--line-2);background:var(--surface);color:var(--muted);font:600 .78rem var(--f-mono);cursor:pointer;padding:0}
+.dot.done{background:var(--who-soft);border-color:var(--who);color:var(--who)}
+.dot.cur{background:var(--who);border-color:var(--who);color:var(--on-who)}
+#step-lbl{font-size:.82rem;color:var(--muted);font-weight:600;margin-left:.3rem}
+.btns{display:flex;gap:.4rem;flex-wrap:wrap}
+.btns .btn{padding:.45rem .8rem;font-size:.88rem}
+@media(min-width:1100px){
+  .sim-grid{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);grid-template-areas:"fig ctl" "fig panel" "fig term";gap:.9rem;align-items:start}
+  .sim-grid>*+*{margin-top:0}
+  .sim-fig{grid-area:fig;position:sticky;top:calc(64px + env(safe-area-inset-top,0px))}
+  .sim-ctl{grid-area:ctl;position:static;box-shadow:none}
+  .sim-panel{grid-area:panel}.sim-term{grid-area:term}
+}
+.sim-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem;display:grid;gap:.6rem;min-width:0}
+.p-step{font:600 .76rem var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--who)}
+.p-step span{color:var(--muted);letter-spacing:.02em;text-transform:none;font-weight:500}
+.p-body{display:grid;gap:.6rem;font-size:.95rem}
+.p-body>*,.p-body [data-k="res"]>*{min-width:0}
+.p-body [data-k="res"]{display:grid;gap:.6rem}
+.hint{font-size:.88rem;color:var(--muted)}
+.httpl,.errl{font:500 .82rem/1.5 var(--f-mono);background:var(--sunk);border-radius:8px;padding:.5rem .65rem;overflow-wrap:anywhere}
+.httpl b{color:var(--who)}
+.errl{color:var(--no);background:var(--no-soft)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.35rem .8rem;align-items:baseline}
+.kv dt{font:500 .8rem var(--f-mono);color:var(--muted)}
+.kv small{color:var(--muted);font-size:.82rem}
+.tag{font:500 .74rem var(--f-mono);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:.05rem .35rem;white-space:nowrap}
+.chk{list-style:none;padding:0;display:grid;gap:.55rem}
+.chk li{display:grid;grid-template-columns:1.4rem minmax(0,1fr);gap:.5rem;align-items:start;font-size:.9rem}
+.chk .i{width:1.3rem;height:1.3rem;border-radius:50%;display:grid;place-items:center;font:700 .72rem var(--f-body);color:var(--surface);margin-top:.15rem}
+.chk .ok .i{background:var(--who)}.chk .ok .i::before{content:"✓"}
+.chk .no .i{background:var(--no)}.chk .no .i::before{content:"✕"}
+.chk .sk .i{background:var(--line-2)}.chk .sk .i::before{content:"–"}
+.rolechk{border:1px solid var(--line);border-radius:10px;padding:.65rem .75rem;display:grid;gap:.5rem}
+.rhead{font-size:.88rem}
+.arr{font:500 .74rem var(--f-mono);color:var(--muted)}
+.arr::before{content:"→ "}.arr::after{content:" →"}
+.rules{list-style:none;padding:0;display:grid;gap:.4rem}
+.rules li{display:grid;gap:.25rem}
+.tri{display:flex;flex-wrap:wrap;gap:.3rem}
+.tri i{font:600 .74rem var(--f-mono);font-style:normal;border-radius:6px;padding:.08rem .4rem}
+.tri .y{background:var(--ok-soft);color:var(--ok)}.tri .y::before{content:"✓ "}
+.tri .n{background:var(--no-soft);color:var(--no)}.tri .n::before{content:"✕ "}
+.verd{font-weight:600;font-size:.9rem}
+.verd.ok,.gres.ok{color:var(--ok)}.verd.no,.gres.no{color:var(--no)}
+.gres{font-weight:600}
+.guess{display:flex;flex-wrap:wrap;gap:.45rem}
+.gbtn{border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:10px;padding:.45rem .8rem;font:600 .88rem var(--f-body);cursor:pointer}
+.gbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+[data-k]{transition:opacity .25s}
+.wait{opacity:.16}
+.chk li.wait .i,.rules li.wait .tri{visibility:hidden}
+.verd.wait{visibility:hidden}
+.sim-term{background:var(--code-bg);border:1px solid var(--code-line);border-radius:var(--r);overflow:hidden;min-width:0}
+.term-bar{padding:.4rem .9rem;border-bottom:1px solid var(--code-line);color:var(--code-dim);font:500 .78rem var(--f-mono)}
+#term-body{padding:.8rem .9rem;overflow-x:auto;font:400 .8rem/1.6 var(--f-mono);color:var(--code-ink);min-height:5.5rem}
+.tl{white-space:pre-wrap;overflow-wrap:anywhere}
+.tl.tab{white-space:pre;overflow-wrap:normal}
+.tl.dim{color:var(--code-dim)}.tl.err{color:var(--code-err)}.tl.good{color:var(--code-ok)}
+.pr{color:var(--code-key)}
+.tcur{display:inline-block;width:.5em;height:1em;background:var(--code-ink);vertical-align:-.15em;margin-left:.15em;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* diagram */
+.dg{display:block;width:100%;height:auto}
+.dg.narrow{max-width:460px;margin-inline:auto}
+.dg text{font-family:var(--f-body);fill:var(--ink)}
+.dg .t-cap{font-size:10.5px;font-weight:600;letter-spacing:.08em;fill:var(--muted)}
+.dg .t-kind{font-size:11.5px;font-weight:600;fill:var(--muted)}
+.dg .t-name{font-family:var(--f-mono);font-size:15px;font-weight:600}
+.dg .t-sub{font-size:12.5px;fill:var(--muted)}
+.dg .t-rule{font-size:12.5px;fill:var(--muted)}
+.dg .t-gate{font-size:13px;font-weight:600}
+.dg .t-gsub{font-size:11.5px;fill:var(--muted)}
+.dg .t-lbl{font-size:10.5px;fill:var(--muted)}
+.dg.narrow .t-kind{font-size:10.5px}.dg.narrow .t-name{font-size:13px}.dg.narrow .t-sub{font-size:11.5px}
+.dg.narrow .t-rule{font-size:10.8px}.dg.narrow .t-gate{font-size:12.5px}.dg.narrow .t-gsub{font-size:11px}
+.dg .c-who{fill:var(--who)}.dg .c-glue,.dg .bind .t-kind{fill:var(--glue)}.dg .c-what,.dg .role .t-kind{fill:var(--what)}
+.dg .box{fill:var(--surface);stroke:var(--line-2);stroke-width:1.2;transition:stroke .25s,fill .25s,stroke-width .25s}
+.dg .apibox{fill:var(--sunk);stroke:var(--line-2);stroke-width:1.2}
+.dg .rim{fill:none;stroke:var(--line-2);stroke-width:1.2}
+.dg .rail,.dg .wire{stroke:var(--line-2);stroke-width:2;fill:none}
+.dg .wire.dash{stroke-dasharray:4 4;stroke-width:1.5}
+.dg .stn{fill:var(--surface);stroke:var(--line-2);stroke-width:2}
+.dg .sicon{fill:var(--who-soft);stroke:var(--who);stroke-width:2;stroke-linejoin:round}
+.dg .st{opacity:0;transition:opacity .2s}
+.dg .st circle{fill:var(--line-2)}
+.dg .st path{fill:none;stroke:var(--surface);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:none}
+.dg .gate.is-now .box{stroke:var(--who);stroke-width:2.4;fill:var(--who-soft)}
+.dg .gate.is-ok .box{stroke:var(--ok);stroke-width:2}
+.dg .gate.is-no .box{stroke:var(--no);stroke-width:2.4;fill:var(--no-soft)}
+.dg .gate.is-skip .box{stroke-dasharray:5 4}
+.dg .gate.is-skip text{fill:var(--muted)}
+.dg .card{transition:opacity .3s}
+.dg .card.is-scan .box{stroke:var(--glue);stroke-width:2.6;fill:var(--glue-soft)}
+.dg .bind.is-match .box{stroke:var(--who);stroke-width:2;fill:var(--who-soft)}
+.dg .bind.is-win .box{stroke:var(--ok);fill:var(--ok-soft)}
+.dg .card.is-skip,.dg .card.is-off{opacity:.4}
+.dg .card.is-skip .box{stroke-dasharray:5 4}
+.dg .role.is-match .box{stroke:var(--ok);stroke-width:2.4;fill:var(--ok-soft)}
+.dg .role.is-miss .box{stroke:var(--no);stroke-width:2}
+.dg .rule circle{fill:var(--line-2)}
+.dg .rule.is-ok circle{fill:var(--ok)}.dg .rule.is-ok text{fill:var(--ink);font-weight:600}
+.dg .rule.is-no circle{fill:var(--no)}
+.dg .ref line{stroke:var(--line-2);stroke-width:1.5}.dg .ref path{fill:var(--line-2)}
+.dg .ref.is-on line{stroke:var(--who);stroke-width:2.2}.dg .ref.is-on path{fill:var(--who)}
+.dg .ref.is-win line{stroke:var(--ok)}.dg .ref.is-win path{fill:var(--ok)}
+.dg .gate.is-ok>.st,.dg .gate.is-no>.st,.dg .gate.is-skip>.st,.dg .bind.is-match>.st,.dg .bind.is-miss>.st,.dg .bind.is-skip>.st,.dg .role.is-match>.st,.dg .role.is-miss>.st{opacity:1}
+.dg .gate.is-ok>.st circle,.dg .role.is-match>.st circle{fill:var(--ok)}
+.dg .bind.is-match>.st circle{fill:var(--who)}
+.dg .bind.is-win>.st circle{fill:var(--ok)}
+.dg .gate.is-no>.st circle,.dg .bind.is-miss>.st circle,.dg .role.is-miss>.st circle{fill:var(--no)}
+.dg .gate.is-ok>.st .g-ok,.dg .bind.is-match>.st .g-ok,.dg .role.is-match>.st .g-ok{display:block}
+.dg .gate.is-no>.st .g-no,.dg .bind.is-miss>.st .g-no,.dg .role.is-miss>.st .g-no{display:block}
+.dg .gate.is-skip>.st .g-sk,.dg .bind.is-skip>.st .g-sk{display:block}
+.dg .subj.is-ver #subj-id{fill:var(--ok);font-weight:600}
+.dg .subj.is-ok .box{stroke:var(--ok);stroke-width:2.4}
+.dg .subj.is-no .box{stroke:var(--no);stroke-width:2.4}
+.dg .etcd.is-hit .box{stroke:var(--ok);stroke-width:2;fill:var(--ok-soft)}
+.dg .etcd.is-hit .rim{stroke:var(--ok)}
+.dg .stamp{opacity:0;transition:opacity .25s}
+.dg .stamp.on{opacity:1}
+.dg .stamp rect{fill:var(--sunk);stroke:var(--line-2);stroke-width:1.2}
+.dg .stamp text{font:600 12.5px var(--f-mono)}
+.dg .stamp.is-ok rect{fill:var(--ok-soft);stroke:var(--ok)}.dg .stamp.is-ok text{fill:var(--ok)}
+.dg .stamp.is-no rect{fill:var(--no-soft);stroke:var(--no)}.dg .stamp.is-no text{fill:var(--no)}
+.dg .pk-halo{fill:var(--who);opacity:.22;transform-box:fill-box;transform-origin:center;animation:pulse 1.6s ease-in-out infinite}
+.dg .pk-dot{fill:var(--who);stroke:var(--surface);stroke-width:2}
+.dg .pk.is-ok .pk-halo,.dg .pk.is-ok .pk-dot{fill:var(--ok)}
+.dg .pk.is-no .pk-halo,.dg .pk.is-no .pk-dot{fill:var(--no)}
+.dg .pk-in.shake{animation:shake .45s}
+.dg .scn{opacity:0;transition:opacity .2s}
+.dg .scn.on{opacity:1}
+.dg .scn circle{fill:none;stroke:var(--glue);stroke-width:2.5;stroke-dasharray:6 4;transform-box:fill-box;transform-origin:center;animation:spin 4s linear infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.22}50%{transform:scale(1.4);opacity:.08}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.mist{list-style:none;padding:0;display:grid;gap:.6rem;counter-reset:m}
+.mist li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.75rem .9rem;display:grid;gap:.2rem}
+.mist li span{color:var(--muted);font-size:.93rem}
+.cheat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+@media(max-width:640px){.cheat{grid-template-columns:minmax(0,1fr)}}
+.cheat div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.65rem .85rem;font-size:.93rem}
+footer{padding-block:1.75rem 2.5rem;color:var(--muted);font-size:.86rem}
+/* Bangla okkhor e letter-spacing juktakkhor bhenge dey, tai label gulo te bondho */
+body{line-height:1.75}
+h1{line-height:1.25}h2,h3{line-height:1.3}
+.eyebrow,.note>b:first-child,.simple>b:first-child,.map>div:first-child,thead th,.card .k,.p-step,.dg .t-cap{letter-spacing:0;text-transform:none}
+.eyebrow,.note>b:first-child,.simple>b:first-child,.card .k,.p-step{font-size:.84rem}
+.map>div:first-child,thead th{font-size:.82rem}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.dg .pk-halo,.dg .scn circle,.tcur,.dg .pk-in.shake{animation:none}*{transition:none!important}}
+</style>
+
+<header class="top"><div class="wrap wide">
+  <a class="brand" href="#top">RBAC <span>সহজ পথ</span></a>
+  <nav class="nav" aria-label="Sections">
+    <a href="#golpo">গল্প</a><a href="#subject">Subject</a><a href="#role">Role</a><a href="#binding">Binding</a><a href="#yaml">YAML</a><a class="cta" href="#sim">Animation</a><a href="#debug">Debug</a>
+  </nav>
+</div></header>
+
+<main id="top">
+<section class="hero"><div class="wrap flow">
+  <p class="eyebrow">Kubernetes · RBAC · শুরু থেকে</p>
+  <h1>কে ঢুকবে, কোথায় ঢুকবে, ঢুকে কী করবে</h1>
+  <p class="lead">Kubernetes এর RBAC (Role-Based Access Control) আসলে এই তিনটা প্রশ্নের উত্তর। চা নিয়ে বসো। আগে একটা office building এর গল্প বলব, তারপর আসল YAML দেখব, আর শেষে তুমি নিজের হাতে request পাঠিয়ে দেখবে API Server কীভাবে Allowed বা 403 Forbidden বলে।</p>
+  <div class="formula" aria-label="Subject + Role + Binding = Permission">
+    <span class="fx who"><b>Subject</b><i>কে?</i></span><span class="op">+</span>
+    <span class="fx what"><b>Role</b><i>কী করতে পারবে?</i></span><span class="op">+</span>
+    <span class="fx glue"><b>Binding</b><i>কাকে দেওয়া হলো?</i></span><span class="op">=</span>
+    <span class="fx res"><b>Permission</b><i>অনুমতি</i></span>
+  </div>
+  <div class="btnrow">
+    <a class="btn pri" href="#golpo">গল্প দিয়ে শুরু করো</a>
+    <a class="btn" href="#sim">সরাসরি animation এ যাও</a>
+  </div>
+</div></section>
+
+<section id="golpo"><div class="wrap flow">
+  <div class="sec-head">
+    <p class="eyebrow">গল্প</p>
+    <h2>একটা office building এর গল্প</h2>
+  </div>
+  <p>ধরো তুমি নতুন চাকরি পেয়েছ। Office টা একটা বড় building। গেটে একজন security guard বসে আছে, আর সে কাউকে এমনি এমনি ঢুকতে দেয় না। তুমি গেলে সে দুইটা কাজ করে:</p>
+  <ol class="plain">
+    <li><b>ID card দেখে।</b> তুমি আসলেই এই office এর লোক তো? এটা <b>Authentication</b>।</li>
+    <li><b>Access list মিলায়।</b> তোমার নামে ৩ তলার file room এ ঢোকার অনুমতি লেখা আছে? এটা <b>Authorization</b>, আর Kubernetes এ এই কাজটা করে <b>RBAC</b>।</li>
+  </ol>
+  <p>Access list টা guard নিজে বানায় না। HR আগে থেকেই দুইটা কাগজ তৈরি করে রাখে: একটা <b>job description</b> (এই পদে কী কী করা যাবে), আর একটা <b>appointment letter</b> (এই job description টা কাকে দেওয়া হলো)। Guard শুধু কাগজ মিলিয়ে দেখে।</p>
+
+  <dl class="map">
+    <div><dt>Office এ</dt><dd>Kubernetes এ</dd></div>
+    <div><dt>Office building</dt><dd><b>Cluster</b><span>পুরো system</span></dd></div>
+    <div><dt>Floor (৩ তলা, ৫ তলা)</dt><dd><b>Namespace</b><span>আলাদা আলাদা এলাকা, যেমন dev আর prod</span></dd></div>
+    <div><dt>Room, আলমারি, file</dt><dd><b>Resource</b><span>Pod, Secret, Deployment</span></dd></div>
+    <div><dt>দেখা, বদলানো, ফেলে দেওয়া</dt><dd><b>Verb</b><span>get, list, update, delete</span></dd></div>
+    <div><dt>Security guard</dt><dd><b>API Server</b><span>সব request এর একমাত্র গেট</span></dd></div>
+    <div><dt>ID card</dt><dd><b>Certificate / Token</b><span>তুমি কে, তার প্রমাণ</span></dd></div>
+    <div><dt>কর্মচারী, department, robot</dt><dd><b>User, Group, ServiceAccount</b><span>এদের একসাথে বলে Subject</span></dd></div>
+    <div><dt>Job description</dt><dd><b>Role / ClusterRole</b><span>কী কী করা যাবে</span></dd></div>
+    <div><dt>Appointment letter</dt><dd><b>RoleBinding / ClusterRoleBinding</b><span>কাকে দেওয়া হলো</span></dd></div>
+  </dl>
+
+  <h3>কেন দরকার?</h3>
+  <p>RBAC না থাকলে building এ সবার হাতে master key। তার মানে:</p>
+  <ul class="plain">
+    <li>নতুন intern ভুল করে <code>kubectl delete deployment --all -n prod</code> চালালে production শেষ।</li>
+    <li>একটা Pod hack হলে attacker সেই Pod এর token দিয়ে সব Secret (database password, API key) পড়ে ফেলতে পারে।</li>
+    <li>কে কী করতে পারে, তার কোনো হিসাব থাকে না।</li>
+  </ul>
+  <p>RBAC এর মূল নীতি <b>least privilege</b>: যার যতটুকু দরকার, ঠিক ততটুকু। বেশি না।</p>
+
+  <h3>ভিতরে কীভাবে কাজ করে?</h3>
+  <p>তুমি <code>kubectl</code> এ যা-ই লেখো, সেটা একটা HTTPS request হয়ে API Server এর কাছে যায়। প্রতিটা request, প্রতিবার, এই গেটগুলো পার হয়:</p>
+  <ol class="pipe">
+    <li><b>Authentication</b><span>তুমি কে?</span><em>ভুল হলে 401</em></li>
+    <li><b>Authorization (RBAC)</b><span>তোমার অনুমতি আছে?</span><em>না থাকলে 403</em></li>
+    <li><b>Admission</b><span>Request টা নিয়ম মেনে লেখা? শুধু create, update, delete এ লাগে।</span></li>
+    <li><b>etcd</b><span>Cluster এর খাতা। এখানে লেখা হয়, এখান থেকে পড়া হয়।</span></li>
+  </ol>
+  <div class="note">
+    <b>মনে রাখো</b>
+    <ul class="plain">
+      <li>RBAC এ শুধু <b>allow</b> লেখা যায়। Deny বলে কোনো rule নেই। কিছু লেখা না থাকলে উত্তর "না"।</li>
+      <li>Permission <b>যোগ হয়</b>। দুইটা Role পেলে দুইটারই সব permission পাবে। একটা Role দিয়ে আরেকটার permission কাটা যায় না।</li>
+      <li>401 আর 403 আলাদা। 401 মানে guard তোমাকে চেনেই না। 403 মানে চেনে, কিন্তু অনুমতি নেই।</li>
+    </ul>
+  </div>
+</div></section>
+
+<section id="subject"><div class="wrap flow">
+  <div class="sec-head">
+    <p class="eyebrow">Step 1</p>
+    <h2>Subject: permission টা কে পাবে?</h2>
+  </div>
+  <p>Subject মানে "কে"। Kubernetes তিন রকম Subject চেনে।</p>
+</div>
+<div class="wrap wide" style="margin-top:1rem"><div class="cards3">
+  <div class="card">
+    <span class="k">User · একজন মানুষ</span>
+    <p>তুমি, আমি, alice। মজার ব্যাপার, Kubernetes এ User নামে কোনো object নেই। <code>kubectl get users</code> কাজ করে না। User আসে বাইরে থেকে: certificate এর CN field, company SSO (OIDC), বা cloud IAM। API Server শুধু নামটা বিশ্বাস করে।</p>
+    <div class="codebox"><pre class="code" data-lang="yaml">
+- kind: User
+  name: alice
+  apiGroup: rbac.authorization.k8s.io
+</pre></div>
+  </div>
+  <div class="card">
+    <span class="k">Group · মানুষের দল</span>
+    <p>এক এক জনকে আলাদা করে permission দিলে পাগল হয়ে যাবে। তাই <code>developers</code> বা <code>sre</code> নামে Group কে permission দাও। Group ও বাইরে থেকে আসে (certificate এর O field, SSO এর groups)। কিছু Group built-in, যেমন <code>system:authenticated</code>, মানে login করা সবাই।</p>
+    <div class="codebox"><pre class="code" data-lang="yaml">
+- kind: Group
+  name: developers
+  apiGroup: rbac.authorization.k8s.io
+</pre></div>
+  </div>
+  <div class="card">
+    <span class="k">ServiceAccount · machine এর ID card</span>
+    <p>Pod, CI/CD pipeline, operator, এরা তো মানুষ না। এদের জন্য ServiceAccount। এটা আসল Kubernetes object, আর একটা namespace এর ভিতরে থাকে। Pod চালু হলে তার ভিতরে একটা token বসে যায়, সেই token দিয়ে Pod API Server কে request পাঠায়। পুরো নাম: <code>system:serviceaccount:dev:app-bot</code></p>
+    <div class="codebox"><pre class="code" data-lang="yaml">
+- kind: ServiceAccount
+  name: app-bot
+  namespace: dev
+</pre></div>
+  </div>
+</div></div>
+<div class="wrap flow" style="margin-top:1rem">
+  <div class="note">
+    <b>মনে রাখো</b>
+    <p>মানুষ = User বা Group। Machine = ServiceAccount। Pod এ কোনো ServiceAccount না বললে সে namespace এর <code>default</code> ServiceAccount পায়, যার বলার মতো কোনো permission নেই (আর না থাকাই ভালো)।</p>
+  </div>
+  <details class="more">
+    <summary>একটু গভীরে: <code>system:masters</code> Group</summary>
+    <p>এই Group এর লোক RBAC check ছাড়াই সব কিছু করতে পারে। কারো certificate এ এটা দিও না। দিলে পরে আর ফেরত নেওয়ার সহজ উপায় থাকে না, কারণ certificate বাতিল করা কঠিন।</p>
+  </details>
+</div></section>
+
+<section id="role"><div class="wrap flow">
+  <div class="sec-head">
+    <p class="eyebrow">Step 2</p>
+    <h2>Role আর ClusterRole: কী কী করা যাবে?</h2>
+  </div>
+  <p>Role হলো job description। এখানে কারো নাম থাকে না, শুধু কাজের list থাকে। প্রতিটা লাইনকে বলে <b>rule</b>, আর একটা rule এ তিনটা জিনিস:</p>
+  <div class="codebox"><pre class="code" data-lang="yaml">
+rules:
+- apiGroups: [""]                  # কোন API group
+  resources: ["pods"]              # কোন জিনিস
+  verbs: ["get", "list", "watch"]  # কী করতে পারবে
+</pre></div>
+  <ul class="plain">
+    <li><code>apiGroups</code>: Resource টা কোন API group এর। <code>""</code> (খালি string) মানে core group: pods, services, configmaps, secrets। Deployment থাকে <code>apps</code> group এ।</li>
+    <li><code>resources</code>: কোন জিনিস। সব সময় plural আর ছোট হাতের: <code>pods</code>, <code>deployments</code>।</li>
+    <li><code>verbs</code>: সেই জিনিসের উপর কী করা যাবে। নিচের table টা দেখো।</li>
+  </ul>
+  <div class="tscroll"><table>
+    <thead><tr><th>Verb</th><th>মানে</th><th>kubectl এ</th><th>HTTP</th></tr></thead>
+    <tbody>
+      <tr><td><code>get</code></td><td>একটা নির্দিষ্ট জিনিস দেখা</td><td><code>kubectl get pod web-1</code></td><td>GET (নাম সহ)</td></tr>
+      <tr><td><code>list</code></td><td>সবগুলো একসাথে দেখা</td><td><code>kubectl get pods</code></td><td>GET</td></tr>
+      <tr><td><code>watch</code></td><td>Live পরিবর্তন দেখা</td><td><code>kubectl get pods -w</code></td><td>GET ?watch</td></tr>
+      <tr><td><code>create</code></td><td>নতুন বানানো</td><td><code>kubectl create -f</code></td><td>POST</td></tr>
+      <tr><td><code>update</code></td><td>পুরোটা বদলানো</td><td><code>kubectl replace -f</code></td><td>PUT</td></tr>
+      <tr><td><code>patch</code></td><td>কিছু অংশ বদলানো</td><td><code>kubectl patch</code></td><td>PATCH</td></tr>
+      <tr><td><code>delete</code></td><td>মুছে ফেলা</td><td><code>kubectl delete pod web-1</code></td><td>DELETE</td></tr>
+    </tbody>
+  </table></div>
+  <p>কোন resource কোন group এ, আর সেটা namespace এর ভিতরে কিনা, এক command এ দেখা যায়: <code>kubectl api-resources</code></p>
+  <p class="warn"><b><code>list</code> কে হালকা ভেবো না।</b> <code>list secrets</code> থাকলে সব Secret এর ভিতরের value ও পড়ে ফেলা যায়, শুধু নাম না।</p>
+
+  <h3>Role নাকি ClusterRole?</h3>
+  <div class="two">
+    <div class="card">
+      <span class="k">Role · এক namespace</span>
+      <p>একটা namespace এর ভিতরে কাজ করে। <code>metadata.namespace</code> দিতে হয়। Office এর ভাষায়: শুধু ৩ তলার job description।</p>
+    </div>
+    <div class="card">
+      <span class="k">ClusterRole · পুরো cluster</span>
+      <p>কোনো namespace এর না। তিনটা কারণে লাগে:</p>
+      <ul class="plain">
+        <li>Cluster-scoped resource এর জন্য, যেমন <code>nodes</code>, <code>namespaces</code>, <code>persistentvolumes</code>। এগুলো কোনো namespace এ থাকে না।</li>
+        <li>সব namespace এ একই permission দিতে।</li>
+        <li>একবার লিখে অনেক namespace এ reuse করতে, template এর মতো।</li>
+      </ul>
+    </div>
+  </div>
+  <p>Kubernetes কিছু ClusterRole আগে থেকেই দিয়ে রাখে: <code>view</code>, <code>edit</code>, <code>admin</code>, <code>cluster-admin</code>। নতুন কিছু লেখার আগে দেখো এগুলো দিয়ে কাজ হয় কিনা।</p>
+  <details class="more">
+    <summary>একটু গভীরে: subresource আর resourceNames</summary>
+    <p><code>pods/log</code> (log পড়া) আর <code>pods/exec</code> (Pod এর ভিতরে ঢোকা) আলাদা resource। <code>pods</code> এ permission থাকলেই log পড়া যায় না, <code>pods/log</code> আলাদা করে দিতে হয়। আর <code>resourceNames: ["app-config"]</code> দিলে শুধু ওই একটা object এ permission পড়ে।</p>
+  </details>
+</div></section>
+
+<section id="binding"><div class="wrap flow">
+  <div class="sec-head">
+    <p class="eyebrow">Step 3</p>
+    <h2>RoleBinding আর ClusterRoleBinding: কাকে দেওয়া হলো?</h2>
+  </div>
+  <p>Role নিজে কিছু করে না। কাগজটা drawer এ পড়ে থাকলে কারো কোনো permission হয় না। <b>Binding</b> হলো সেই কাগজটা কারো হাতে তুলে দেওয়া। Binding এ দুইটা অংশ:</p>
+  <ul class="plain">
+    <li><code>subjects</code>: কাকে দিচ্ছি। User, Group বা ServiceAccount। একসাথে অনেকজনও হয়।</li>
+    <li><code>roleRef</code>: কোন Role বা ClusterRole দিচ্ছি। একটাই।</li>
+  </ul>
+  <p>আর Binding কোন ধরনের, তার উপর নির্ভর করে permission টা <b>কোথায়</b> কাজ করবে। নিচে চারটা জোড়া, আর প্রতিটায় permission কোথায় পৌঁছায়।</p>
+  <div class="combos">
+    <div class="combo">
+      <div class="pair"><span class="pill what">Role</span><span class="op">+</span><span class="pill glue">RoleBinding (dev)</span></div>
+      <div class="scope"><span class="on">dev</span><span>prod</span><span>nodes</span></div>
+      <p>শুধু ওই এক namespace এ। সবচেয়ে বেশি এটাই ব্যবহার হয়।</p>
+    </div>
+    <div class="combo">
+      <div class="pair"><span class="pill what">ClusterRole</span><span class="op">+</span><span class="pill glue">RoleBinding (dev)</span></div>
+      <div class="scope"><span class="on">dev</span><span>prod</span><span>nodes</span></div>
+      <p>ClusterRole টা এখানে template। কাজ করবে শুধু RoleBinding এর namespace এ। Cluster-scoped resource (nodes) এভাবে পাওয়া যায় না।</p>
+    </div>
+    <div class="combo">
+      <div class="pair"><span class="pill what">ClusterRole</span><span class="op">+</span><span class="pill glue">ClusterRoleBinding</span></div>
+      <div class="scope"><span class="on">dev</span><span class="on">prod</span><span class="on">nodes</span></div>
+      <p>সব namespace আর cluster-scoped resource। সাবধানে দাও।</p>
+    </div>
+    <div class="combo">
+      <div class="pair"><span class="pill what">Role</span><span class="op">+</span><span class="pill glue">ClusterRoleBinding</span></div>
+      <div class="scope"><span class="bad">হয় না</span></div>
+      <p>API Server reject করে। ClusterRoleBinding শুধু ClusterRole ধরতে পারে।</p>
+    </div>
+  </div>
+  <div class="simple">
+    <b>সহজ করে বললে</b>
+    <p>Role ঠিক করে <b>কী</b>। Binding এর subjects ঠিক করে <b>কে</b>। আর Binding এর ধরন ঠিক করে <b>কোথায়</b>।</p>
+  </div>
+  <ul class="plain">
+    <li><code>roleRef</code> একবার লিখলে আর বদলানো যায় না। বদলাতে হলে Binding delete করে নতুন বানাতে হয়।</li>
+    <li>নিজের চেয়ে বেশি permission কাউকে দেওয়া যায় না। যে permission তোমার নিজের নেই, সেই Role তুমি বানাতে বা bind করতে পারবে না। এতে ঘুরিয়ে নিজের permission বাড়ানো আটকায়।</li>
+  </ul>
+</div></section>
+
+<section id="yaml"><div class="wrap flow">
+  <div class="sec-head">
+    <p class="eyebrow">Step 4</p>
+    <h2>YAML এ লেখা</h2>
+  </div>
+  <p>এবার আসল জিনিস। alice কে <code>dev</code> namespace এ Pod দেখার অনুমতি দেব। দুইটা object লাগবে: একটা Role, একটা RoleBinding।</p>
+  <div class="codebox">
+    <div class="codebar"><span>rbac.yaml</span><button class="copy" type="button">Copy</button></div>
+<pre class="code" data-lang="yaml">
+# ১) Job description: কী কী করা যাবে
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: dev            # শুধু dev namespace এ
+rules:
+- apiGroups: [""]           # core group, pods এখানে
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+# ২) Appointment letter: কাকে দেওয়া হলো
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alice-read-pods
+  namespace: dev
+subjects:                   # কে পাবে
+- kind: User
+  name: alice
+  apiGroup: rbac.authorization.k8s.io
+roleRef:                    # কোন Role
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+</pre></div>
+  <p>চালাও আর পরীক্ষা করো:</p>
+  <div class="codebox">
+    <div class="codebar"><span>terminal</span><button class="copy" type="button">Copy</button></div>
+<pre class="code" data-lang="sh">
+kubectl apply -f rbac.yaml
+
+kubectl auth can-i list pods -n dev --as alice      # yes
+kubectl auth can-i delete pods -n dev --as alice    # no, delete verb নেই
+kubectl auth can-i list pods -n prod --as alice     # no, অন্য namespace
+</pre></div>
+
+  <details class="more">
+    <summary>Pod এর জন্য একই জিনিস (ServiceAccount)</summary>
+    <div class="flow">
+      <p>তিনটা ধাপ: ServiceAccount বানাও, RoleBinding এর subject এ সেটা দাও, আর Pod এর spec এ তার নাম লেখো।</p>
+      <div class="codebox">
+        <div class="codebar"><span>app-bot.yaml</span><button class="copy" type="button">Copy</button></div>
+<pre class="code" data-lang="yaml">
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-bot
+  namespace: dev
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: app-bot-read
+  namespace: dev
+subjects:
+- kind: ServiceAccount        # এখানে apiGroup লাগে না
+  name: app-bot
+  namespace: dev
+roleRef:
+  kind: Role
+  name: app-reader            # pod-reader এর মতোই আরেকটা Role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app
+  namespace: dev
+spec:
+  serviceAccountName: app-bot # Pod এই ID card নিয়ে চলবে
+  containers:
+  - name: app
+    image: nginx
+</pre></div>
+      <p>পরীক্ষা: <code>kubectl auth can-i list pods -n dev --as system:serviceaccount:dev:app-bot</code></p>
+    </div>
+  </details>
+
+  <details class="more">
+    <summary>পুরো cluster এর জন্য (ClusterRole + ClusterRoleBinding)</summary>
+    <div class="flow">
+      <p><code>sre</code> Group এর সবাই সব namespace এর Pod আর Deployment দেখতে পারবে, সাথে Node ও।</p>
+      <div class="codebox">
+        <div class="codebar"><span>sre-view.yaml</span><button class="copy" type="button">Copy</button></div>
+<pre class="code" data-lang="yaml">
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-viewer        # namespace নেই
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sre-view
+subjects:
+- kind: Group
+  name: sre
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-viewer
+  apiGroup: rbac.authorization.k8s.io
+</pre></div>
+    </div>
+  </details>
+  <p>নিচের animation এ ঠিক এই object গুলোই বসানো আছে।</p>
+</div></section>
+
+<section id="sim" class="band"><div class="wrap wide">
+  <div class="sec-head">
+    <p class="eyebrow">হাতে-কলমে</p>
+    <h2>নিজের হাতে request পাঠাও, guard কে কাজ করতে দেখো</h2>
+    <p class="lead">নিচে একটা ছোট cluster আছে: তিনজন Subject, চারটা Binding, চারটা Role। একটা scenario বেছে নাও, তারপর <b>সামনে</b> চেপে চেপে দেখো request টা কোথায় যায় আর API Server কী কী মিলায়।</p>
+  </div>
+  <div class="sim-pick">
+    <p class="lbl">Scenario বেছে নাও</p>
+    <div class="chips" id="sc-chips"></div>
+    <details class="custom">
+      <summary>নিজের মতো request বানাও</summary>
+      <div class="qrow">
+        <label for="q-who">কে? (Subject)<select id="q-who"></select></label>
+        <label for="q-verb">কী করবে? (Verb)<select id="q-verb"></select></label>
+        <label for="q-res">কোন জিনিস? (Resource)<select id="q-res"></select></label>
+        <label for="q-ns">কোথায়? (Namespace)<select id="q-ns"></select></label>
+      </div>
+    </details>
+    <div class="say"><span id="sc-say"></span><small id="sc-en"></small></div>
+  </div>
+  <div class="sim-grid">
+    <figure class="sim-fig">
+      <div id="stage"></div>
+      <figcaption>উপরের লাইনটা request এর রাস্তা: Subject থেকে API Server এর তিন গেট পার হয়ে etcd। নিচের দুইটা column হলো RBAC এর খাতা: Binding (কাকে) আর Role (কী)। তীর মানে roleRef।</figcaption>
+    </figure>
+    <div class="sim-panel" id="panel" aria-live="polite"></div>
+    <div class="sim-term"><div class="term-bar" id="term-ttl">terminal</div><div id="term-body"></div></div>
+    <div class="sim-ctl">
+      <div class="dots" id="dots">
+        <button type="button" class="dot" data-n="1" aria-label="Step 1">1</button>
+        <button type="button" class="dot" data-n="2" aria-label="Step 2">2</button>
+        <button type="button" class="dot" data-n="3" aria-label="Step 3">3</button>
+        <button type="button" class="dot" data-n="4" aria-label="Step 4">4</button>
+        <button type="button" class="dot" data-n="5" aria-label="Step 5">5</button>
+        <button type="button" class="dot" data-n="6" aria-label="Step 6">6</button>
+        <button type="button" class="dot" data-n="7" aria-label="Step 7">7</button>
+        <span id="step-lbl"></span>
+      </div>
+      <div class="btns">
+        <button type="button" id="bt-prev" class="btn">← পিছনে</button>
+        <button type="button" id="bt-next" class="btn pri">সামনে →</button>
+        <button type="button" id="bt-play" class="btn" aria-pressed="false">Auto play</button>
+        <button type="button" id="bt-reset" class="btn">আবার শুরু</button>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section id="debug"><div class="wrap flow">
+  <div class="sec-head">
+    <p class="eyebrow">কাজের সময়</p>
+    <h2>আটকে গেলে: 403 debug করার command</h2>
+  </div>
+  <div class="codebox">
+    <div class="codebar"><span>terminal</span><button class="copy" type="button">Copy</button></div>
+<pre class="code" data-lang="sh">
+kubectl auth whoami                       # API Server আমাকে কী নামে চেনে?
+kubectl auth can-i delete pods -n dev     # আমি কি এটা করতে পারি?
+kubectl auth can-i --list -n dev          # dev এ আমার সব permission
+kubectl describe role pod-reader -n dev   # Role এ আসলে কী লেখা
+kubectl get rolebindings,clusterrolebindings -A -o wide | grep alice   # alice কোথায় bind করা
+</pre></div>
+  <p>403 এর error message টা মন দিয়ে পড়ো। ওখানেই লেখা থাকে কে, কোন verb, কোন resource, কোন API group, কোন namespace। এই পাঁচটার একটা তোমার Role বা Binding এর সাথে মিলছে না।</p>
+
+  <h3>Production এ যে ভুলগুলো সবাই করে</h3>
+  <ul class="mist">
+    <li><b>সবাইকে <code>cluster-admin</code> দিয়ে দেওয়া</b><span>কাজ চলছে বলে রেখে দিও না। Namespace এর ভিতরে <code>edit</code> বা নিজের লেখা Role দাও।</span></li>
+    <li><b><code>verbs: ["*"]</code> আর <code>resources: ["*"]</code> লেখা</b><span>আজ যা আছে শুধু তা না, কাল যে নতুন resource আসবে তারও permission দিয়ে দিলে।</span></li>
+    <li><b><code>default</code> ServiceAccount এ permission দেওয়া</b><span>ওই namespace এর সব Pod সেই permission পেয়ে যায়। প্রতিটা app এর আলাদা ServiceAccount বানাও।</span></li>
+    <li><b>Secret এর <code>get</code>, <code>list</code>, <code>watch</code> হালকাভাবে দেওয়া</b><span>Secret পড়তে পারা মানে password পড়তে পারা।</span></li>
+    <li><b><code>create pods</code> কে নিরাপদ ভাবা</b><span>যে Pod বানাতে পারে, সে ওই namespace এর যেকোনো Secret বা ServiceAccount নিজের Pod এ mount করে নিতে পারে।</span></li>
+  </ul>
+
+  <h3>এক নজরে</h3>
+  <div class="cheat">
+    <div><b>Subject</b> = কে। <b>Role</b> = কী। <b>Binding</b> = দুইটাকে জোড়া লাগানো।</div>
+    <div>Role আর RoleBinding = এক namespace। ClusterRole আর ClusterRoleBinding = পুরো cluster।</div>
+    <div>শুধু allow লেখা যায়। কিছু লেখা না থাকলে deny। Permission যোগ হয়।</div>
+    <div>401 = guard চেনে না। 403 = চেনে, অনুমতি নেই।</div>
+    <div>পরীক্ষা করার command: <code>kubectl auth can-i</code></div>
+    <div><code>roleRef</code> বদলানো যায় না। নতুন Binding বানাতে হয়।</div>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">উদাহরণের নামগুলো (alice, bob, app-bot) বানানো। Terminal এর output নমুনা, তোমার cluster এ নাম আর সংখ্যা আলাদা হবে।</div></footer>
+
+<script>
+(function(){
+'use strict';
+var mm=window.matchMedia?window.matchMedia('(prefers-reduced-motion: reduce)'):null;
+var reduce=!!(mm&&mm.matches);
+function $(s,r){return (r||document).querySelector(s);}
+function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function code(s){return '<code>'+esc(s)+'</code>';}
+function sleep(ms){return new Promise(function(r){setTimeout(r,reduce?Math.min(ms,30):ms);});}
+function wait(ms){return new Promise(function(r){setTimeout(r,ms);});}
+
+/* ---------- code blocks: highlight + copy ---------- */
+function hlLine(raw,lang){
+  var body=raw,com='',m=raw.match(/(^|\s)#.*$/);
+  if(m){body=raw.slice(0,m.index+m[1].length);com=raw.slice(m.index+m[1].length);}
+  var h=esc(body);
+  if(lang==='yaml'){
+    h=h.replace(/^(\s*(?:-\s+)?)([A-Za-z][\w.\/-]*)(:)/,'$1<span class="k">$2</span>$3');
+    h=h.replace(/&quot;[^&]*?&quot;/g,function(s){return '<span class="s">'+s+'</span>';});
+  }else{
+    h=h.replace(/^(\s*)(kubectl|curl)\b/,'$1<span class="k">$2</span>');
+  }
+  return h+(com?'<span class="c">'+esc(com)+'</span>':'');
+}
+$$('pre.code').forEach(function(pre){
+  var raw=pre.textContent.replace(/^\n/,'').replace(/\s+$/,''),lang=pre.getAttribute('data-lang')||'yaml';
+  pre.innerHTML=raw.split('\n').map(function(l){return hlLine(l,lang);}).join('\n');
+  var btn=pre.parentNode.querySelector('.copy');
+  if(!btn)return;
+  btn.addEventListener('click',function(){
+    function back(){setTimeout(function(){btn.textContent='Copy';},1500);}
+    function done(){btn.textContent='Copied';back();}
+    function fallback(){
+      var r=document.createRange();r.selectNodeContents(pre);
+      var s=window.getSelection();s.removeAllRanges();s.addRange(r);
+      btn.textContent='Selected';back();
+    }
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(raw).then(done,fallback);}else{fallback();}
+  });
+});
+
+/* ---------- the example cluster ---------- */
+var SUBJ={
+  alice:{label:'alice',user:'alice',groups:['developers','system:authenticated'],prompt:'alice@laptop:~$',opt:'alice (User)'},
+  bot:{label:'app-bot',user:'system:serviceaccount:dev:app-bot',sa:{ns:'dev',name:'app-bot'},groups:['system:serviceaccounts','system:serviceaccounts:dev','system:authenticated'],prompt:'app-pod:/$',opt:'app-bot (Pod, ServiceAccount)'},
+  bob:{label:'bob',user:'bob',groups:['sre','system:authenticated'],prompt:'bob@laptop:~$',opt:'bob (User, sre Group)'}
+};
+var RES={
+  pods:{group:'',kind:'Pod',sing:'pod',name:'web-7d9f8-x2k4q',ns:true},
+  deployments:{group:'apps',kind:'Deployment',sing:'deployment',name:'web',ns:true},
+  configmaps:{group:'',kind:'ConfigMap',sing:'configmap',name:'app-config',ns:true},
+  secrets:{group:'',kind:'Secret',sing:'secret',name:'db-password',ns:true},
+  nodes:{group:'',kind:'Node',sing:'node',name:'node-1',ns:false}
+};
+var VERBS=['get','list','watch','create','delete'];
+var ROLES={
+  'pod-reader':{kind:'Role',ns:'dev',name:'pod-reader',rules:[{g:[''],r:['pods'],v:['get','list','watch'],short:'pods: get list watch'}]},
+  'app-reader':{kind:'Role',ns:'dev',name:'app-reader',rules:[{g:[''],r:['pods'],v:['get','list','watch'],short:'pods: get list watch'},{g:[''],r:['configmaps'],v:['get','list'],short:'configmaps: get list'}]},
+  'editor':{kind:'ClusterRole',name:'editor',rules:[{g:[''],r:['pods','configmaps'],v:['*'],short:'pods configmaps: * (সব)'},{g:['apps'],r:['deployments'],v:['*'],short:'deployments: * (সব)'}]},
+  'cluster-viewer':{kind:'ClusterRole',name:'cluster-viewer',rules:[{g:[''],r:['pods','nodes'],v:['get','list','watch'],short:'pods nodes: get list watch'},{g:['apps'],r:['deployments'],v:['get','list','watch'],short:'deployments: get list watch'}]}
+};
+var BINDS=[
+  {kind:'RoleBinding',ns:'dev',name:'alice-read-pods',subj:{kind:'User',name:'alice'},ref:'pod-reader'},
+  {kind:'RoleBinding',ns:'dev',name:'app-bot-read',subj:{kind:'ServiceAccount',name:'app-bot',ns:'dev'},ref:'app-reader'},
+  {kind:'RoleBinding',ns:'prod',name:'sre-deploy',subj:{kind:'Group',name:'sre'},ref:'editor'},
+  {kind:'ClusterRoleBinding',name:'sre-view',subj:{kind:'Group',name:'sre'},ref:'cluster-viewer'}
+];
+var PRESETS=[
+  {who:'alice',verb:'list',res:'pods',ns:'dev',t:'alice: dev এ Pod list দেখাও'},
+  {who:'alice',verb:'delete',res:'pods',ns:'dev',t:'alice: dev এ Pod delete করো'},
+  {who:'alice',verb:'list',res:'pods',ns:'prod',t:'alice: prod এ Pod list দেখাও'},
+  {who:'bot',verb:'list',res:'pods',ns:'dev',t:'Pod (app-bot): dev এ Pod list'},
+  {who:'bot',verb:'get',res:'secrets',ns:'dev',t:'Pod (app-bot): Secret পড়ো'},
+  {who:'bob',verb:'delete',res:'pods',ns:'prod',t:'bob: prod এ Pod delete'},
+  {who:'bob',verb:'delete',res:'pods',ns:'dev',t:'bob: dev এ Pod delete'},
+  {who:'bob',verb:'list',res:'nodes',ns:'dev',t:'bob: সব Node এর list'}
+];
+var TABLE={
+  pods:['NAME              READY   STATUS    RESTARTS   AGE','web-7d9f8-x2k4q   1/1     Running   0          3d','api-5c6b7-9hj2m   1/1     Running   1          3d'],
+  deployments:['NAME   READY   UP-TO-DATE   AVAILABLE   AGE','web    2/2     2            2           3d','api    1/1     1            1           3d'],
+  configmaps:['NAME            DATA   AGE','app-config      3      12d','feature-flags   2      12d'],
+  secrets:['NAME          TYPE     DATA   AGE','db-password   Opaque   1      12d','api-key       Opaque   1      12d'],
+  nodes:['NAME     STATUS   ROLES           AGE   VERSION','node-1   Ready    control-plane   40d   v1.34.2','node-2   Ready    <none>          40d   v1.34.2']
+};
+
+function subjMatch(b,s){
+  var j=b.subj;
+  if(j.kind==='User')return j.name===s.user;
+  if(j.kind==='Group')return s.groups.indexOf(j.name)>-1;
+  return !!(s.sa&&s.sa.ns===j.ns&&s.sa.name===j.name);
+}
+function has(list,x){return list.indexOf(x)>-1||list.indexOf('*')>-1;}
+function isWrite(v){return v==='create'||v==='delete';}
+
+/* RBAC er moto kore: namespace er RoleBinding + sob ClusterRoleBinding; prothom allow tei thame */
+function evaluate(q){
+  var s=SUBJ[q.who],R=RES[q.res],clusterReq=!R.ns,allowed=false,by=-1;
+  var rows=BINDS.map(function(b){
+    var row={b:b,role:ROLES[b.ref],considered:true,subjOk:false,why:'',rules:null,allow:false,checked:false};
+    if(b.kind==='RoleBinding'){
+      if(clusterReq){row.considered=false;row.why='cluster';}
+      else if(b.ns!==q.ns){row.considered=false;row.why='ns';}
+    }
+    if(row.considered){row.subjOk=subjMatch(b,s);if(!row.subjOk)row.why='subj';}
+    return row;
+  });
+  rows.forEach(function(row,i){
+    if(!row.subjOk||allowed)return;
+    row.checked=true;
+    row.rules=row.role.rules.map(function(ru){
+      var g=has(ru.g,R.group),r=has(ru.r,q.res),v=has(ru.v,q.verb);
+      return {g:g,r:r,v:v,ok:g&&r&&v,rule:ru};
+    });
+    if(row.rules.some(function(x){return x.ok;})){row.allow=true;allowed=true;by=i;}
+  });
+  return {q:q,s:s,R:R,rows:rows,allowed:allowed,by:by,clusterReq:clusterReq};
+}
+
+/* ---------- text builders ---------- */
+function http(ev){
+  var q=ev.q,R=ev.R,base=(R.group?'/apis/'+R.group+'/v1':'/api/v1')+(R.ns?'/namespaces/'+q.ns:'')+'/'+q.res;
+  var m={get:'GET',list:'GET',watch:'GET',create:'POST','delete':'DELETE'}[q.verb];
+  return {m:m,path:base+((q.verb==='get'||q.verb==='delete')?'/'+R.name:'')+(q.verb==='watch'?'?watch=true':'')};
+}
+function kubectlCmd(ev){
+  var q=ev.q,R=ev.R,ns=R.ns?' -n '+q.ns:'';
+  switch(q.verb){
+    case 'get':return 'kubectl get '+R.sing+' '+R.name+ns;
+    case 'list':return 'kubectl get '+q.res+ns;
+    case 'watch':return 'kubectl get '+q.res+ns+' --watch-only';
+    case 'create':return 'kubectl create -f '+R.sing+'.yaml'+ns;
+    default:return 'kubectl delete '+R.sing+' '+R.name+ns;
+  }
+}
+function curlCmd(ev){
+  var h=http(ev);
+  return 'curl -sk'+(h.m==='GET'?'':' -X '+h.m)+' -H "Authorization: Bearer $TOKEN"'+(h.m==='POST'?' -H "Content-Type: application/json" -d @'+ev.R.sing+'.json':'')+' https://kubernetes.default.svc'+h.path;
+}
+function statusText(ev){return ev.allowed?(ev.q.verb==='create'?'201 Created':'200 OK'):'403 Forbidden';}
+function fbd(ev){
+  var q=ev.q,R=ev.R,gs=R.group?q.res+'.'+R.group:q.res,named=(q.verb==='get'||q.verb==='delete');
+  return (named?gs+' "'+R.name+'"':gs)+' is forbidden: User "'+ev.s.user+'" cannot '+q.verb+' resource "'+q.res+'" in API group "'+R.group+'"'+(R.ns?' in the namespace "'+q.ns+'"':' at the cluster scope');
+}
+function termOut(ev){
+  var q=ev.q,R=ev.R,ok=ev.allowed,L=[],nm='"metadata": { "name": "'+R.name+'" }';
+  if(ev.s.sa){
+    L.push({t:'# HTTP '+statusText(ev),c:ok?'good':'err'});
+    if(!ok){
+      L.push({t:'{\n  "kind": "Status",\n  "status": "Failure",\n  "message": "'+fbd(ev).replace(/"/g,'\\"')+'",\n  "reason": "Forbidden",\n  "code": 403\n}',c:'err'});
+    }else if(q.verb==='list'){
+      L.push({t:'{\n  "kind": "'+R.kind+'List",\n  "items": [ { '+nm+' }, ... ]\n}',c:''});
+    }else if(q.verb==='watch'){
+      L.push({t:'{ "type": "ADDED", "object": { "kind": "'+R.kind+'", '+nm+' } }',c:''});
+      L.push({t:'# নতুন event আসতে থাকবে…',c:'dim'});
+    }else if(q.verb==='delete'){
+      L.push({t:'# '+R.name+' delete হয়ে গেছে',c:'dim'});
+    }else{
+      L.push({t:'{ "kind": "'+R.kind+'", '+nm+', ... }',c:''});
+    }
+    return L;
+  }
+  var pre=R.sing+(R.group?'.'+R.group:'');
+  if(!ok){
+    L.push({t:'Error from server (Forbidden): '+(q.verb==='create'?'error when creating "'+R.sing+'.yaml": ':'')+fbd(ev),c:'err'});
+  }else if(q.verb==='get'){
+    L.push({t:TABLE[q.res][0]+'\n'+TABLE[q.res][1],c:'tab'});
+  }else if(q.verb==='list'){
+    L.push({t:TABLE[q.res].join('\n'),c:'tab'});
+  }else if(q.verb==='watch'){
+    L.push({t:'# live পরিবর্তনের অপেক্ষায়… (Ctrl+C দিয়ে বন্ধ)',c:'dim'});
+  }else if(q.verb==='create'){
+    L.push({t:pre+'/'+R.name+' created',c:'good'});
+  }else{
+    L.push({t:pre+' "'+R.name+'" deleted',c:'good'});
+  }
+  return L;
+}
+var VPH={get:['একটা ',' দেখতে'],list:['সব ',' এর list দেখতে'],watch:['',' এর live পরিবর্তন দেখতে'],create:['নতুন একটা ',' বানাতে'],'delete':['একটা ',' delete করতে']};
+function sayHTML(ev){
+  var q=ev.q,R=ev.R,obj=(q.verb==='list'||q.verb==='watch')?q.res:R.kind;
+  return '<b>'+esc(ev.s.label)+'</b> ('+(ev.s.sa?'Pod, ServiceAccount':'User')+') চায় '+(R.ns?'<b>'+q.ns+'</b> namespace এ ':'পুরো cluster এর ')+VPH[q.verb][0]+'<b>'+obj+'</b>'+VPH[q.verb][1]+'।';
+}
+function sayEN(ev){
+  return (ev.s.sa?'ServiceAccount '+ev.s.sa.name:'User '+ev.s.user)+' → '+ev.q.verb+' '+ev.q.res+(ev.R.ns?' · namespace '+ev.q.ns:' · cluster scope');
+}
+function fix(ev){
+  var q=ev.q,s=ev.s,matched=ev.rows.filter(function(r){return r.subjOk;}),out;
+  if(!matched.length){
+    var other=ev.rows.filter(function(r){return !r.considered&&r.why==='ns'&&subjMatch(r.b,s);})[0];
+    if(ev.clusterReq)out=code(q.res)+' কোনো namespace এ থাকে না। এর জন্য ClusterRole আর ClusterRoleBinding লাগবে।';
+    else if(other)out=esc(s.label)+' এর permission আছে, কিন্তু '+code(other.b.ns)+' namespace এ। '+code(q.ns)+' এ কাজ করতে চাইলে ওখানে আলাদা RoleBinding লাগবে।';
+    else out='কোনো Binding এ '+esc(s.label)+' এর নাম বা Group নেই। আগে একটা Role আর RoleBinding বানাতে হবে।';
+  }else{
+    var near=null;
+    matched.forEach(function(r){(r.rules||[]).forEach(function(x){if(x.g&&x.r&&!x.v)near=r;});});
+    if(near)out='Binding ঠিক আছে। '+code(near.role.name)+' এ '+code(q.res)+' আছে, কিন্তু '+code(q.verb)+' verb টা নেই। '+code('verbs')+' এ যোগ করলেই হবে।';
+    else out='Binding ঠিক আছে, কিন্তু Role এ '+code(q.res)+' resource টাই নেই। নতুন rule যোগ করো, বা আলাদা Role বানাও।';
+  }
+  if(q.res==='secrets')out+=' তবে Secret এর permission দেওয়ার আগে দুইবার ভাবো।';
+  return out;
+}
+
+/* ---------- diagram geometry ---------- */
+var LAY={
+  wide:{W:960,H:608,narrow:false,
+    subj:{x:16,y:30,w:160,h:126},api:{x:236,y:30,w:480,h:126},apiLbl:{x:250,y:51,a:'start'},rail:66,
+    gy:84,gh:62,gates:[{x:252,w:144},{x:408,w:144},{x:564,w:136}],
+    etcd:{x:776,y:36,w:168,h:112},stamp:{x:16,y:166,w:160,h:28},
+    conn:[480,146,198],brk:[60,900],khata:{x:488,y:180},
+    hdrY:220,cy0:232,ch:82,cg:12,bx:60,bw:380,rx:520,rw:380,
+    pts:{subj:[176,66],edge:[236,66],g1:[324,66],g2:[480,66],g3:[632,66],etcd:[776,66]}},
+  narrow:{W:400,H:718,narrow:true,
+    subj:{x:8,y:12,w:190,h:92},api:{x:8,y:146,w:384,h:134},apiLbl:{x:200,y:167,a:'middle'},rail:186,
+    gy:202,gh:68,gates:[{x:16,w:118},{x:141,w:118},{x:266,w:118}],
+    etcd:{x:256,y:16,w:138,h:84},stamp:{x:92,y:114,w:112,h:24},
+    conn:[200,270,298],brk:[8,392],khata:{x:207,y:291},
+    hdrY:316,cy0:326,ch:88,cg:10,bx:8,bw:180,rx:212,rw:180,
+    pts:{subj:[75,104],edge:[75,146],g1:[75,186],g2:[200,186],g3:[325,186],etcd:[325,100]}}
+};
+var ORDER=['subj','edge','g1','g2','g3','etcd'];
+var stage=$('#stage'),layout='wide',Q={who:'alice',verb:'list',res:'pods',ns:'dev'},EV=null;
+
+function tx(x,y,c,s,a){return '<text x="'+x+'" y="'+y+'" class="'+c+'"'+(a?' text-anchor="'+a+'"':'')+'>'+esc(s)+'</text>';}
+function ic(x,y){return '<g class="st" transform="translate('+x+','+y+')"><circle r="9"/><path class="g-ok" d="M-4 .5l2.8 2.8L4.2-3"/><path class="g-no" d="M-3.2-3.2L3.2 3.2M3.2-3.2L-3.2 3.2"/><path class="g-sk" d="M-3.6 0H3.6"/></g>';}
+function cyl(e){
+  var rx=e.w/2,ry=10,x=e.x,y=e.y,b=y+e.h;
+  return '<path class="box" d="M'+x+' '+(y+ry)+' A'+rx+' '+ry+' 0 0 1 '+(x+e.w)+' '+(y+ry)+' V'+(b-ry)+' A'+rx+' '+ry+' 0 0 1 '+x+' '+(b-ry)+' Z"/><path class="rim" d="M'+x+' '+(y+ry)+' A'+rx+' '+ry+' 0 0 0 '+(x+e.w)+' '+(y+ry)+'"/>';
+}
+function subjIcon(cx,cy,pod){
+  return '<g class="sicon" transform="translate('+cx+','+cy+')">'+(pod
+    ?'<path d="M0-16L14-8V8L0 16L-14 8V-8Z"/><rect x="-5" y="-5" width="10" height="10" rx="1.5"/>'
+    :'<circle cx="0" cy="-7" r="7"/><path d="M-13 15c0-8 6-12 13-12s13 4 13 12"/>')+'</g>';
+}
+function rowY(i){var L=LAY[layout];return L.cy0+i*(L.ch+L.cg);}
+function spotB(i){var L=LAY[layout];return [L.bx+L.bw-(L.narrow?16:20),rowY(i)+(L.narrow?17:20)];}
+function spotR(i){var L=LAY[layout];return [L.rx+L.rw-(L.narrow?16:20),rowY(i)+(L.narrow?17:20)];}
+
+function build(){
+  var L=LAY[layout],P=L.pts,s=EV.s,nar=L.narrow,o=[],a=L.api,px=nar?10:14;
+  o.push('<svg class="dg'+(nar?' narrow':'')+'" viewBox="0 0 '+L.W+' '+L.H+'" role="img" aria-label="Request er rasta: Subject theke API Server er tin gate par hoye etcd. Niche RBAC er Binding ar Role er list.">');
+  o.push('<rect class="apibox" x="'+a.x+'" y="'+a.y+'" width="'+a.w+'" height="'+a.h+'" rx="14"/>');
+  o.push(tx(L.apiLbl.x,L.apiLbl.y,'t-cap','API SERVER · security guard',L.apiLbl.a));
+  o.push('<path class="rail" d="'+(nar?'M'+P.subj+' L'+P.g1+' L'+P.g3+' L'+P.etcd:'M'+P.subj+' L'+P.etcd)+'"/>');
+  if(nar){o.push(tx(68,132,'t-lbl','request','end')+tx(332,132,'t-lbl','data','start'));}
+  else{o.push(tx(206,58,'t-lbl','request','middle')+tx(206,84,'t-lbl','উত্তর','middle')+tx(746,58,'t-lbl','data','middle'));}
+  var GT=nar?[['1 · Authn','তুমি কে?'],['2 · RBAC','অনুমতি?'],['3 · Admission','নিয়ম ঠিক?']]
+            :[['1 · Authentication','তুমি কে?'],['2 · Authorization','RBAC: অনুমতি?'],['3 · Admission','নিয়ম ঠিক?']];
+  L.gates.forEach(function(g,k){
+    var cx=g.x+g.w/2;
+    o.push('<line class="rail" x1="'+cx+'" y1="'+L.rail+'" x2="'+cx+'" y2="'+L.gy+'"/><circle class="stn" cx="'+cx+'" cy="'+L.rail+'" r="4.5"/>');
+    o.push('<g class="gate" id="g'+(k+1)+'"><rect class="box" x="'+g.x+'" y="'+L.gy+'" width="'+g.w+'" height="'+L.gh+'" rx="10"/>'+
+      tx(g.x+px-2,L.gy+26,'t-gate',GT[k][0])+tx(g.x+px-2,L.gy+46,'t-gsub',GT[k][1])+ic(g.x+g.w-15,L.gy+L.gh-15)+'</g>');
+  });
+  var e=L.etcd,ecx=e.x+e.w/2;
+  o.push('<g class="etcd" id="etcd">'+cyl(e)+tx(ecx,e.y+e.h/2+8,'t-name','etcd','middle')+tx(ecx,e.y+e.h/2+26,'t-sub','cluster এর খাতা','middle')+'</g>');
+  var sb=L.subj,kt=s.sa?'POD · ServiceAccount':'USER';
+  o.push('<g class="subj" id="subj"><rect class="box" x="'+sb.x+'" y="'+sb.y+'" width="'+sb.w+'" height="'+sb.h+'" rx="12"/>'+
+    (nar?subjIcon(sb.x+30,sb.y+46,!!s.sa)+tx(sb.x+58,sb.y+30,'t-kind c-who',kt)+tx(sb.x+58,sb.y+53,'t-name',s.label)+'<text id="subj-id" class="t-sub" x="'+(sb.x+58)+'" y="'+(sb.y+73)+'"></text>'
+        :subjIcon(sb.x+80,sb.y+40,!!s.sa)+tx(sb.x+80,sb.y+78,'t-kind c-who',kt,'middle')+tx(sb.x+80,sb.y+100,'t-name',s.label,'middle')+'<text id="subj-id" class="t-sub" text-anchor="middle" x="'+(sb.x+80)+'" y="'+(sb.y+118)+'"></text>')+'</g>');
+  var st=L.stamp;
+  o.push('<g class="stamp" id="stamp"><rect x="'+st.x+'" y="'+st.y+'" width="'+st.w+'" height="'+st.h+'" rx="'+(st.h/2)+'"/><text id="stamp-t" x="'+(st.x+st.w/2)+'" y="'+(st.y+st.h/2+4.5)+'" text-anchor="middle"></text></g>');
+  var c=L.conn;
+  o.push('<line class="wire dash" x1="'+c[0]+'" y1="'+c[1]+'" x2="'+c[0]+'" y2="'+c[2]+'"/><line class="wire" x1="'+L.brk[0]+'" y1="'+c[2]+'" x2="'+L.brk[1]+'" y2="'+c[2]+'"/>');
+  o.push(tx(L.khata.x,L.khata.y,'t-lbl','RBAC এর খাতা'));
+  o.push(tx(L.bx,L.hdrY,'t-cap c-glue',nar?'BINDING · কাকে?':'BINDING · কাকে দেওয়া হলো?'));
+  o.push(tx(L.rx,L.hdrY,'t-cap c-what',nar?'ROLE · কী?':'ROLE · কী করতে পারবে?'));
+  EV.rows.forEach(function(row,i){
+    var y=rowY(i),b=row.b,ro=row.role,cy=y+L.ch/2,rl='';
+    function scope(o2){return o2.ns?(nar?' · ':' · namespace: ')+o2.ns:(nar?'':' · পুরো cluster');}
+    o.push('<g class="card bind" id="b'+i+'"><rect class="box" x="'+L.bx+'" y="'+y+'" width="'+L.bw+'" height="'+L.ch+'" rx="10"/>'+
+      tx(L.bx+px,y+(nar?22:24),'t-kind',b.kind+scope(b))+tx(L.bx+px,y+(nar?45:48),'t-name',b.name)+
+      tx(L.bx+px,y+(nar?66:68),'t-sub',(nar?'':'subject: ')+b.subj.kind+' '+b.subj.name)+ic(spotB(i)[0],spotB(i)[1])+'</g>');
+    o.push('<g class="ref" id="a'+i+'"><line x1="'+(L.bx+L.bw)+'" y1="'+cy+'" x2="'+(L.rx-6)+'" y2="'+cy+'"/><path d="M'+L.rx+' '+cy+' l-8 -4.5 v9 Z"/>'+(nar?'':tx((L.bx+L.bw+L.rx)/2,cy-7,'t-lbl','roleRef','middle'))+'</g>');
+    ro.rules.forEach(function(ru,j){
+      var ry=y+(nar?60:61)+j*(nar?16:15);
+      rl+='<g class="rule" id="r'+i+'x'+j+'"><circle cx="'+(L.rx+px+4)+'" cy="'+(ry-4)+'" r="3.5"/>'+tx(L.rx+px+14,ry,'t-rule',ru.short)+'</g>';
+    });
+    o.push('<g class="card role" id="r'+i+'"><rect class="box" x="'+L.rx+'" y="'+y+'" width="'+L.rw+'" height="'+L.ch+'" rx="10"/>'+
+      tx(L.rx+px,y+(nar?20:22),'t-kind',ro.kind+scope(ro))+tx(L.rx+px,y+(nar?41:43),'t-name',ro.name)+rl+ic(spotR(i)[0],spotR(i)[1])+'</g>');
+  });
+  o.push('<g class="scn" id="scn"><circle r="15"/></g>');
+  o.push('<g class="pk" id="pk"><g class="pk-in"><circle class="pk-halo" r="14"/><circle class="pk-dot" r="7"/></g></g>');
+  o.push('</svg>');
+  stage.innerHTML=o.join('');
+}
+
+/* ---------- state ---------- */
+var step=0,runId=0,playing=false,playTok=0,guess=null,scnAt=[0,0];
+var STEPN=['শুরু','Request পাঠানো','Authentication','Request ভেঙে দেখা','Binding খোঁজা','Role এর rule মিলানো','সিদ্ধান্ত','উত্তর'];
+var GS=['is-now','is-ok','is-no','is-skip'],CS=['is-scan','is-match','is-miss','is-skip','is-off','is-win'];
+function el(id){return document.getElementById(id);}
+function setState(node,names,active){if(!node)return;names.forEach(function(n){node.classList.remove(n);});active.forEach(function(n){node.classList.add(n);});}
+function setPos(node,p){if(node)node.setAttribute('transform','translate('+p[0]+','+p[1]+')');}
+function gateState(i,arr){setState(el('g'+i),GS,arr);}
+function bindCls(row){return !row.considered?'is-skip':row.subjOk?'is-match':'is-miss';}
+
+/* step n er pura chhobi, kono animation chara */
+function applyStatic(n){
+  var ev=EV,ok=ev.allowed,wr=isWrite(ev.q.verb),L=LAY[layout];
+  gateState(1,n>=2?(n===2?['is-now','is-ok']:['is-ok']):[]);
+  var g2=[];
+  if(n>=3&&(n<=5||(n===6&&!ok)))g2.push('is-now');
+  if(n>=6)g2.push(ok?'is-ok':'is-no');
+  gateState(2,g2);
+  gateState(3,(n>=6&&ok)?[wr?'is-ok':'is-skip']:[]);
+  setState(el('etcd'),['is-hit'],(n>=6&&ok)?['is-hit']:[]);
+  setState(el('subj'),['is-ver','is-ok','is-no'],(n>=2?['is-ver']:[]).concat(n===7?[ok?'is-ok':'is-no']:[]));
+  var sid=el('subj-id');
+  if(sid)sid.textContent=n>=2?'✓ ID ঠিক আছে':'ID: '+(ev.s.sa?'SA token':'certificate');
+  ev.rows.forEach(function(row,i){
+    var b=[],r=[];
+    if(n>=4)b.push(bindCls(row));
+    if(n>=5){if(row.allow)b.push('is-win');r.push(row.checked?(row.allow?'is-match':'is-miss'):'is-off');}
+    setState(el('b'+i),CS,b);setState(el('r'+i),CS,r);
+    setState(el('a'+i),['is-on','is-win'],(n>=5&&row.checked)?(row.allow?['is-on','is-win']:['is-on']):[]);
+    row.role.rules.forEach(function(_,j){
+      setState(el('r'+i+'x'+j),['is-ok','is-no'],(n>=5&&row.checked)?[row.rules[j].ok?'is-ok':'is-no']:[]);
+    });
+  });
+  var pk=el('pk');
+  setState(pk,['is-ok','is-no'],n>=6?[ok?'is-ok':'is-no']:[]);
+  var at=n===0?'subj':n===1?'edge':n===2?'g1':n<=5?'g2':n===6?(ok?'etcd':'g2'):'subj';
+  setPos(pk,L.pts[at]);
+  setState(el('stamp'),['on','is-ok','is-no'],n===7?['on',ok?'is-ok':'is-no']:[]);
+  var stt=el('stamp-t');if(stt)stt.textContent=statusText(ev);
+  setState(el('scn'),['on'],[]);
+}
+
+/* ---------- motion ---------- */
+function tween(node,pts,dur,alive){
+  return new Promise(function(res){
+    var last=pts[pts.length-1],segs=[],total=0,i,t0=null;
+    for(i=1;i<pts.length;i++){var d=Math.sqrt(Math.pow(pts[i][0]-pts[i-1][0],2)+Math.pow(pts[i][1]-pts[i-1][1],2));segs.push(d);total+=d;}
+    if(reduce||!total){setPos(node,last);return res();}
+    function frame(t){
+      if(!alive())return res();
+      if(t0===null)t0=t;
+      var k=Math.min(1,(t-t0)/dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2,d2=e*total,s=0;
+      while(s<segs.length-1&&d2>segs[s]){d2-=segs[s];s++;}
+      var f=segs[s]?Math.min(1,d2/segs[s]):1;
+      setPos(node,[pts[s][0]+(pts[s+1][0]-pts[s][0])*f,pts[s][1]+(pts[s+1][1]-pts[s][1])*f]);
+      if(k<1)requestAnimationFrame(frame);else res();
+    }
+    requestAnimationFrame(frame);
+  });
+}
+function route(a,b){
+  var P=LAY[layout].pts,i=ORDER.indexOf(a),j=ORDER.indexOf(b),out=[],k;
+  if(i<=j){for(k=i;k<=j;k++)out.push(P[ORDER[k]]);}else{for(k=i;k>=j;k--)out.push(P[ORDER[k]]);}
+  return out;
+}
+function move(a,b,dur,alive){return tween(el('pk'),route(a,b),dur,alive);}
+function scan(to,dur,alive){var from=scnAt;scnAt=to;return tween(el('scn'),[from,to],dur,alive);}
+function reveal(k){var n=$('#panel [data-k="'+k+'"]');if(n)n.classList.remove('wait');}
+function revealAll(){$$('#panel .wait').forEach(function(n){n.classList.remove('wait');});}
+
+function animateTo(n,my){
+  var ev=EV,L=LAY[layout],ok=ev.allowed,wr=isWrite(ev.q.verb),pk=el('pk'),scn=el('scn');
+  function alive(){return my===runId;}
+  if(n===1)return move('subj','edge',450,alive);
+  if(n===2)return move('edge','g1',550,alive).then(function(){if(!alive())return;gateState(1,['is-now']);return sleep(450);});
+  if(n===3){gateState(1,['is-ok']);return move('g1','g2',600,alive).then(function(){if(!alive())return;gateState(2,['is-now']);return sleep(200);});}
+  if(n===4){
+    scnAt=[L.conn[0],L.conn[1]];setPos(scn,scnAt);scn.classList.add('on');
+    var c4=sleep(250);
+    ev.rows.forEach(function(row,i){
+      c4=c4.then(function(){if(!alive())return;return scan(spotB(i),280,alive);})
+        .then(function(){if(!alive())return;el('b'+i).classList.add('is-scan');return sleep(420);})
+        .then(function(){if(!alive())return;var b=el('b'+i);b.classList.remove('is-scan');b.classList.add(bindCls(row));reveal('b'+i);return sleep(180);});
+    });
+    return c4;
+  }
+  if(n===5){
+    ev.rows.forEach(function(row,i){if(!row.checked)el('r'+i).classList.add('is-off');});
+    var c5=sleep(200),any=false;
+    ev.rows.forEach(function(row,i){
+      if(!row.checked)return;
+      any=true;
+      c5=c5.then(function(){
+        if(!alive())return;
+        scnAt=spotB(i);setPos(scn,scnAt);scn.classList.add('on');el('a'+i).classList.add('is-on');
+        return scan(spotR(i),450,alive);
+      });
+      row.rules.forEach(function(x,j){
+        c5=c5.then(function(){if(!alive())return;return sleep(380);})
+          .then(function(){if(!alive())return;el('r'+i+'x'+j).classList.add(x.ok?'is-ok':'is-no');reveal('r'+i+'x'+j);});
+      });
+      c5=c5.then(function(){if(!alive())return;return sleep(300);}).then(function(){
+        if(!alive())return;
+        el('r'+i).classList.add(row.allow?'is-match':'is-miss');
+        if(row.allow){el('a'+i).classList.add('is-win');el('b'+i).classList.add('is-win');}
+        reveal('v'+i);return sleep(250);
+      });
+    });
+    return any?c5:sleep(500);
+  }
+  if(n===6){
+    if(!ok){
+      gateState(2,['is-now','is-no']);pk.classList.add('is-no');
+      var inn=$('.pk-in',pk);inn.classList.remove('shake');inn.getBoundingClientRect();inn.classList.add('shake');
+      return sleep(600);
+    }
+    gateState(2,['is-ok']);pk.classList.add('is-ok');
+    return sleep(250).then(function(){if(!alive())return;return move('g2','g3',520,alive);})
+      .then(function(){if(!alive())return;gateState(3,[wr?'is-ok':'is-skip']);return sleep(wr?450:120);})
+      .then(function(){if(!alive())return;return move('g3','etcd',520,alive);})
+      .then(function(){if(!alive())return;el('etcd').classList.add('is-hit');return sleep(300);});
+  }
+  return move(ok?'etcd':'g2','subj',ok?1100:800,alive);
+}
+
+/* ---------- side panel ---------- */
+var VWHY={get:'GET, একটা নির্দিষ্ট নাম',list:'GET, পুরো collection',watch:'GET, সাথে ?watch=true',create:'POST','delete':'DELETE'};
+function tri(l,y){return '<i class="'+(y?'y':'n')+'">'+l+'</i>';}
+function renderPanel(n,anim){
+  var ev=EV,q=ev.q,s=ev.s,R=ev.R,h=http(ev),w=anim?' wait':'',T='',E='',B='',ok=ev.allowed,wr=isWrite(q.verb),nm=esc(s.label);
+  if(n===0){
+    T='শুরু করার আগে';E='Before the request';
+    B='<p>'+sayHTML(ev)+'</p><p>আগে নিজে আন্দাজ করো: API Server কী বলবে?</p>'+
+      '<div class="guess"><button type="button" class="gbtn" data-guess="ok" aria-pressed="'+(guess==='ok')+'">Allowed হবে</button>'+
+      '<button type="button" class="gbtn" data-guess="no" aria-pressed="'+(guess==='no')+'">403 Forbidden হবে</button></div>'+
+      '<p class="hint">তারপর <b>সামনে</b> চাপো। প্রতিটা চাপে request এক ধাপ এগোবে।</p>';
+  }else if(n===1){
+    T='Request পাঠানো';E='The client sends a request';
+    B=(s.sa?'<p>Pod এর ভিতরের app সরাসরি API Server কে একটা HTTPS request পাঠায়:</p>'
+           :'<p>'+nm+' terminal এ '+code(kubectlCmd(ev))+' লিখল। kubectl সেটাকে একটা HTTPS request বানায়:</p>')+
+      '<p class="httpl"><b>'+h.m+'</b> '+esc(h.path)+'</p>'+
+      '<p>Request এর সাথে ID card ও যায়: '+(s.sa?'Pod এর ভিতরে বসানো <b>ServiceAccount token</b>।':'kubeconfig এর <b>client certificate</b>।')+'</p>';
+  }else if(n===2){
+    T='Authentication: তুমি কে?';E='Who are you?';
+    B='<p>Guard আগে ID card দেখে। '+(s.sa?'Token':'Certificate')+' থেকে সে নাম আর Group বের করে:</p>'+
+      '<dl class="kv"><dt>user</dt><dd>'+code(s.user)+'</dd><dt>groups</dt><dd>'+s.groups.map(function(g){return code(g);}).join(' ')+'</dd></dl>'+
+      '<p class="hint">ID card ভুল হলে এখানেই <b>401 Unauthorized</b>, RBAC পর্যন্ত যাওয়াই হয় না। এখানে ID ঠিক আছে।</p>';
+  }else if(n===3){
+    T='Request টা ভেঙে দেখা';E='From HTTP to RBAC attributes';
+    B='<p>RBAC HTTP বোঝে না। API Server request টাকে চারটা টুকরো করে নেয়:</p>'+
+      '<dl class="kv"><dt>verb</dt><dd>'+code(q.verb)+' <small>'+VWHY[q.verb]+'</small></dd>'+
+      '<dt>resource</dt><dd>'+code(q.res)+'</dd>'+
+      '<dt>apiGroup</dt><dd>'+code('"'+R.group+'"')+(R.group?'':' <small>খালি মানে core group</small>')+'</dd>'+
+      '<dt>namespace</dt><dd>'+(R.ns?code(q.ns):'<small>নেই, '+esc(q.res)+' cluster-scoped</small>')+'</dd></dl>'+
+      '<p>এখন প্রশ্ন একটাই: <b>'+nm+'</b> কি '+(R.ns?'<b>'+q.ns+'</b> এ ':'')+'<b>'+q.res+'</b> <b>'+q.verb+'</b> করতে পারে?</p>';
+  }else if(n===4){
+    T='Binding খোঁজা: কাকে কী দেওয়া আছে?';E='Which bindings name this subject?';
+    var cnt=ev.rows.filter(function(r){return r.subjOk;}).length;
+    B='<p>'+(ev.clusterReq
+        ?code(q.res)+' কোনো namespace এ থাকে না, তাই শুধু <b>ClusterRoleBinding</b> দেখা হয়। RoleBinding এখানে কাজ করে না।'
+        :'API Server দুইটা জায়গায় খোঁজে: '+code(q.ns)+' namespace এর <b>RoleBinding</b>, আর সব <b>ClusterRoleBinding</b>। অন্য namespace এর RoleBinding সে খুলেও দেখে না।')+'</p><ul class="chk">'+
+      ev.rows.map(function(row,i){
+        var b=row.b,sj=b.subj.kind+' '+b.subj.name,st=!row.considered?'sk':row.subjOk?'ok':'no',why;
+        if(!row.considered)why=row.why==='cluster'?'RoleBinding দিয়ে cluster-scoped resource পাওয়া যায় না। দেখা হয় না।':code(b.ns)+' namespace এর Binding, request '+code(q.ns)+' এর। খুলেও দেখা হয় না।';
+        else if(!row.subjOk)why='এটা '+code(sj)+' এর জন্য, '+nm+' এর না।';
+        else if(b.subj.kind==='Group')why=nm+' '+code(b.subj.name)+' Group এর লোক। মিলে গেছে।';
+        else if(b.subj.kind==='User')why='subject এ '+code(sj)+' লেখা। মিলে গেছে।';
+        else why='subject এ '+code(sj)+', এই Pod এরই ServiceAccount। মিলে গেছে।';
+        return '<li class="'+st+w+'" data-k="b'+i+'"><span class="i"></span><div><b class="mono">'+esc(b.name)+'</b> <span class="tag">'+b.kind+(b.ns?' · '+b.ns:'')+'</span><br>'+why+'</div></li>';
+      }).join('')+'</ul>'+
+      '<p class="hint'+w+'" data-k="bsum">'+(cnt?cnt+' টা Binding এ '+nm+' কে পাওয়া গেল। এবার তার Role খোলার পালা।':'কোনো Binding এ '+nm+' কে পাওয়া গেল না।')+'</p>';
+  }else if(n===5){
+    T='Role এর rule মিলানো';E='Do the role\'s rules cover it?';
+    if(!ev.rows.some(function(r){return r.checked;})){
+      B='<p>কোনো Binding মেলেনি, তাই কোনো Role খোলাই হলো না। মিলানোর মতো কোনো rule নেই।</p>';
+    }else{
+      B='<p>একটা rule এ তিনটা জিনিস একসাথে মিলতে হবে: apiGroup, resource, verb।</p>';
+      ev.rows.forEach(function(row,i){
+        if(!row.checked)return;
+        var ro=row.role;
+        B+='<div class="rolechk"><p class="rhead"><b class="mono">'+esc(row.b.name)+'</b> <span class="arr">roleRef</span> <b class="mono">'+esc(ro.name)+'</b> <span class="tag">'+ro.kind+(ro.ns?' · '+ro.ns:'')+'</span></p><ul class="rules">'+
+          row.rules.map(function(x,j){return '<li class="'+(x.ok?'ok':'no')+w+'" data-k="r'+i+'x'+j+'"><code>'+esc(x.rule.short)+'</code><span class="tri">'+tri('apiGroup',x.g)+tri('resource',x.r)+tri('verb',x.v)+'</span></li>';}).join('')+
+          '</ul><p class="verd '+(row.allow?'ok':'no')+w+'" data-k="v'+i+'">'+(row.allow?'একটা rule পুরো মিলে গেছে। Allow।':'কোনো rule পুরো মেলেনি।')+'</p>'+
+          ((row.b.kind==='RoleBinding'&&ro.kind==='ClusterRole')?'<p class="hint">লক্ষ করো: '+code(ro.name)+' একটা ClusterRole, কিন্তু Binding টা '+code(row.b.ns)+' এর RoleBinding। তাই permission টা শুধু '+code(row.b.ns)+' এ কাজ করে।</p>':'')+'</div>';
+      });
+      var skipped=ev.rows.filter(function(r){return r.subjOk&&!r.checked;});
+      if(skipped.length)B+='<p class="hint'+w+'" data-k="skp">'+skipped.map(function(r){return code(r.role.name);}).join(', ')+' আর খোলাই হয়নি। একটা allow পেলেই RBAC থেমে যায়।</p>';
+    }
+  }else if(n===6){
+    if(ok){
+      T='সিদ্ধান্ত: Allowed';E='A rule allows it';
+      B='<p>একটা rule মিলে গেছে, ব্যস। RBAC প্রথম allow পেলেই থেমে যায়, বাকিগুলো আর দেখে না।</p>'+
+        (wr?'<p>এটা write request ('+code(q.verb)+'), তাই এবার <b>Admission</b> গেট: request টা cluster এর নিয়ম মেনে লেখা কিনা দেখা হয়। তারপর <b>etcd</b> তে save।</p>'
+           :'<p>এটা read request ('+code(q.verb)+'), তাই <b>Admission</b> গেট লাগে না। API Server সরাসরি <b>etcd</b> থেকে data আনে।</p>');
+    }else{
+      T='সিদ্ধান্ত: Denied';E='No rule allows it';
+      B='<p>কোনো rule allow বলেনি। RBAC এ "deny" লিখতে হয় না। Allow না থাকা মানেই deny।</p><p>Request টা এখানেই থেমে যায়। Admission বা etcd পর্যন্ত পৌঁছায় না।</p>';
+    }
+  }else{
+    T='উত্তর: '+statusText(ev);E='The response comes back';
+    if(ok){
+      var by=ev.rows[ev.by];
+      B='<p>'+nm+' তার উত্তর পেয়ে গেল।</p><p class="hint">Permission টা এসেছে এই পথে: '+code(by.b.name)+' ('+by.b.kind+') → '+code(by.role.name)+' ('+by.role.kind+')।</p>';
+    }else{
+      B='<p>'+nm+' এর কাছে এই error ফিরে যায়:</p><p class="errl">'+esc(fbd(ev))+'</p>'+
+        '<p><b>কীভাবে ঠিক করবে:</b> '+fix(ev)+'</p><p class="hint">401 না, 403। মানে guard তোমাকে চেনে, শুধু অনুমতি নেই।</p>';
+    }
+    if(guess){
+      var hit=(guess==='ok')===ok;
+      B+='<p class="gres '+(hit?'ok':'no')+'">'+(hit?'তোমার আন্দাজ ঠিক ছিল।':'তোমার আন্দাজ মেলেনি। Step 4 আর 5 আরেকবার দেখো, উত্তর ওখানেই।')+'</p>';
+    }
+    B='<div class="'+(anim?'wait':'')+'" data-k="res">'+B+'</div>';
+  }
+  $('#panel').innerHTML='<p class="p-step">'+(n?'Step '+n+' / 7':'শুরু')+' <span>· '+E+'</span></p><h3>'+T+'</h3><div class="p-body">'+B+'</div>';
+}
+function renderTerm(n,pending){
+  var ev=EV,s=ev.s,h='<div class="tl"><span class="pr">'+esc(s.prompt)+'</span> '+esc(s.sa?curlCmd(ev):kubectlCmd(ev))+(n===0?'<span class="tcur"></span>':'')+'</div>';
+  if(n>=1&&(n<7||pending))h+='<div class="tl dim"># উত্তরের অপেক্ষায়…</div>';
+  if(n===7&&!pending)termOut(ev).forEach(function(l){h+='<div class="tl '+l.c+'">'+esc(l.t)+'</div>';});
+  $('#term-ttl').textContent=s.sa?'app-bot Pod এর ভিতর থেকে':s.label+' এর terminal';
+  $('#term-body').innerHTML=h;
+}
+function renderCtl(){
+  $$('#dots .dot').forEach(function(d){
+    var n=+d.getAttribute('data-n');
+    d.classList.toggle('cur',n===step);d.classList.toggle('done',n<step);
+    if(n===step)d.setAttribute('aria-current','step');else d.removeAttribute('aria-current');
+  });
+  $('#step-lbl').textContent=step===0?'শুরু':'Step '+step+' / 7 · '+STEPN[step];
+  $('#bt-prev').disabled=step===0;$('#bt-next').disabled=step===7;
+  var bp=$('#bt-play');bp.textContent=playing?'থামাও':'Auto play';bp.setAttribute('aria-pressed',playing?'true':'false');
+}
+
+/* ---------- stepping ---------- */
+function go(n,anim){
+  runId++;var my=runId;step=n;
+  renderCtl();renderPanel(n,!!anim);renderTerm(n,!!anim);
+  if(!anim){applyStatic(n);return Promise.resolve();}
+  applyStatic(n-1);
+  function fin(){if(my!==runId)return;applyStatic(n);revealAll();renderTerm(n,false);}
+  return Promise.resolve().then(function(){return animateTo(n,my);}).then(fin,fin);
+}
+function stop(){if(!playing)return;playing=false;playTok++;renderCtl();}
+function play(){
+  var tok=++playTok;playing=true;
+  var start=step>=7?go(0,false).then(function(){return wait(500);}):Promise.resolve();
+  renderCtl();
+  function loop(){
+    if(!playing||tok!==playTok)return;
+    if(step>=7){playing=false;renderCtl();return;}
+    return go(step+1,true).then(function(){
+      if(!playing||tok!==playTok)return;
+      return wait(step===4||step===5?1700:1200).then(loop);
+    });
+  }
+  start.then(loop);
+}
+function syncPick(){
+  $('#q-who').value=Q.who;$('#q-verb').value=Q.verb;$('#q-res').value=Q.res;$('#q-ns').value=Q.ns;
+  $('#q-ns').disabled=!RES[Q.res].ns;
+  $$('#sc-chips .chipb').forEach(function(c,i){
+    var p=PRESETS[i],on=p.who===Q.who&&p.verb===Q.verb&&p.res===Q.res&&(p.ns===Q.ns||!RES[Q.res].ns);
+    c.setAttribute('aria-pressed',on?'true':'false');
+  });
+  $('#sc-say').innerHTML=sayHTML(EV);$('#sc-en').textContent=sayEN(EV);
+}
+function setQ(q){
+  stop();Q={who:q.who,verb:q.verb,res:q.res,ns:q.ns};EV=evaluate(Q);guess=null;
+  build();syncPick();go(0,false);
+}
+function opts(sel,list){sel.innerHTML=list.map(function(o){return '<option value="'+o[0]+'">'+esc(o[1])+'</option>';}).join('');}
+function pickLayout(){return stage.clientWidth&&stage.clientWidth<660?'narrow':'wide';}
+
+/* ---------- wire up ---------- */
+$('#sc-chips').innerHTML=PRESETS.map(function(p,i){return '<button type="button" class="chipb" data-i="'+i+'" aria-pressed="false">'+esc(p.t)+'</button>';}).join('');
+$('#sc-chips').addEventListener('click',function(e){var c=e.target.closest('.chipb');if(c)setQ(PRESETS[+c.getAttribute('data-i')]);});
+opts($('#q-who'),Object.keys(SUBJ).map(function(k){return [k,SUBJ[k].opt];}));
+opts($('#q-verb'),VERBS.map(function(v){return [v,v];}));
+opts($('#q-res'),Object.keys(RES).map(function(k){return [k,k];}));
+opts($('#q-ns'),[['dev','dev'],['prod','prod']]);
+['q-who','q-verb','q-res','q-ns'].forEach(function(id){
+  el(id).addEventListener('change',function(){setQ({who:$('#q-who').value,verb:$('#q-verb').value,res:$('#q-res').value,ns:$('#q-ns').value});});
+});
+$('#bt-prev').addEventListener('click',function(){stop();if(step>0)go(step-1,false);});
+$('#bt-next').addEventListener('click',function(){stop();if(step<7)go(step+1,true);});
+$('#bt-play').addEventListener('click',function(){if(playing)stop();else play();});
+$('#bt-reset').addEventListener('click',function(){stop();go(0,false);});
+$('#dots').addEventListener('click',function(e){var d=e.target.closest('.dot');if(!d)return;stop();go(+d.getAttribute('data-n'),false);});
+$('#panel').addEventListener('click',function(e){var g=e.target.closest('[data-guess]');if(!g)return;guess=g.getAttribute('data-guess');renderPanel(step,false);});
+
+layout=pickLayout();EV=evaluate(Q);build();syncPick();go(0,false);
+if(window.ResizeObserver){
+  new ResizeObserver(function(){
+    var l=pickLayout();
+    if(l===layout)return;
+    stop();runId++;layout=l;build();applyStatic(step);revealAll();
+  }).observe(stage);
+}
+})();
+</script>
+
+</body>
+</html>
